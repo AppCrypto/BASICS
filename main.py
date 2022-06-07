@@ -39,10 +39,10 @@ wb3=web3.Web3(web3.HTTPProvider('http://127.0.0.1:7550', request_kwargs={'timeou
 contract_source_path = './contracts/Contract.sol'
 compiled_sol = compile_source_file(contract_source_path)
 
-# #BN256G2.sol
-# contract_id, contract_interface = compiled_sol.popitem()
-# address = deploy_contract(wb3, contract_interface)
-# print("Deployed {0} to: {1}\n".format(contract_id, address))
+#strings.sol
+contract_id, contract_interface = compiled_sol.popitem()
+address = deploy_contract(wb3, contract_interface)
+print("Deployed {0} to: {1}\n".format(contract_id, address))
 
 #Contract.sol
 contract_id, contract_interface = compiled_sol.popitem()
@@ -130,50 +130,28 @@ def checkKey1(EK1, EK1p, EK2, EK2p, tmp):
    # print(G2,EK2,EK1,G1)
    assert(pairing(G2,EK2)==pairing(EK1,G1))
 
-checkKey0(PK, EK0, EK0p, [c, w1, w2, w3], gid, attr)
-checkKey1(EK1, EK1p, EK2, EK2p, tmp)   
-# print(c,w1)
-# print(G1ToArr(PK), G1ToArr(EK0), G2ToArr(EK1), G1ToArr(EK0p), G2ToArr(EK1p), c, w1, w2, w3)
-print(G2ToArr(G2))
+# checkKey0(PK, EK0, EK0p, [c, w1, w2, w3], gid, attr)
+# checkKey1(EK1, EK1p, EK2, EK2p, tmp)   
+# # print(c,w1)
+# # print(G1ToArr(PK), G1ToArr(EK0), G2ToArr(EK1), G1ToArr(EK0p), G2ToArr(EK1p), c, w1, w2, w3)
+# # print(G2ToArr(G2))
 
 gas_estimate = ctt.functions.checkKey0(G1ToArr(PK), G1ToArr(EK0), G1ToArr(EK0p),  [c, w1, w2, w3], gid, attr).estimateGas()
 print("Sending transaction to checkKey0 ",gas_estimate)
 ret = ctt.functions.checkKey0(G1ToArr(PK), G1ToArr(EK0), G1ToArr(EK0p),  [c, w1, w2, w3], gid, attr).call({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
 print("checkKey0:",ret)
 
-print(curve_order)
-print(d)
-# multiply(G2, curve_order-(d%curve_order))
-# print(pairing(G2,EK2)/pairing(EK1,G1))
-# EK1=neg(EK1)
-# print(pairing(G2,EK2)*pairing(EK1,G1))
 gas_estimate = ctt.functions.checkKey1(G2ToArr(EK1), G2ToArr(EK1p), G1ToArr(EK2), G1ToArr(EK2p),  [c, w1, w2, w3]).estimateGas()
 print("Sending transaction to checkKey1 ",gas_estimate)
 ret = ctt.functions.checkKey1(G2ToArr(EK1), G2ToArr(EK1p), G1ToArr(EK2), G1ToArr(EK2p),  [c, w1, w2, w3]).call({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
 print("checkKey1:",ret)
 
 
-# gas_estimate = ctt.functions.verifyBGLS2().estimateGas()
-# print("Sending transaction to verifyBGLS2 ",gas_estimate)
-# ret = ctt.functions.verifyBGLS2().call({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
-# print("verifyBGLS2:",ret)
-
-
-
-# import pysolcrypto.aosring as ring
-# msg = ring.randsn()
-# keys = ring.aosring_randkeys(4)
-# sigs=ring.aosring_sign(*keys, message=msg)
-# pks=[]
-# for i in range(0,len(sigs[0])):
-#    pks.append(sigs[0][i][0].n)
-#    pks.append(sigs[0][i][1].n)
-# assert ring.aosring_check(*sigs, message=msg)
-# gas_estimate = ctt.functions.VerifyRingSig(pks,sigs[1],sigs[2],msg).estimateGas()
-# print("Sending transaction to VerifyRingSig(pks,sigs[2],sigs[3],msg)",gas_estimate)
-# ret = ctt.functions.VerifyRingSig(pks,sigs[1],sigs[2],msg).call({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
-# print("ring Signature verify:",ret)
-
+gas_estimate = ctt.functions.testCall().estimateGas()
+print("Sending transaction to testCall ",gas_estimate)
+# ret = ctt.functions.testCall().transact({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
+ret = ctt.functions.testCall().call({"from":wb3.eth.accounts[1], 'gas': 500_000_000})
+print("testCall:",ret)
 
 
 

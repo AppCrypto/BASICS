@@ -1,10 +1,11 @@
 pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 // import "../contracts/BN256G2.sol";
-
+import "../contracts/strings.sol";
 contract Contract
 {
 	// using BN256G2 for *;
+	using strings for *;
 	// p = p(u) = 36u^4 + 36u^3 + 24u^2 + 6u + 1
     uint256 constant FIELD_ORDER = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
@@ -744,5 +745,51 @@ contract Contract
 	
 	    return true;
 	}
+
+
+	bytes[] opstack;
+	bytes[] valstack;
+
+    // function push(bytes memory data) public {
+    //     stack.push(data);
+    // }
+
+    // function pop() public returns (bytes memory data) {
+    //     data = stack[stack.length - 1];
+    //     // stack.length -= 1;
+    //     delete stack[stack.length -1];
+    // }
+
+
+	// function testNode()
+	//     public payable
+	//     returns (string memory)
+	// {
+	// 	string memory acp="A or ( B and C )";
+
+	// 	strings.slice memory s = acp.toSlice();                
+ //        strings.slice memory delim = " ".toSlice();                            
+ //        string[] memory parts = new string[](s.count(delim)+1);                  
+ //        for (uint i = 0; i < parts.length; i++) {                              
+ //           parts[i] = s.split(delim).toString();                               
+ //        }                         
+
+ //        // return parts[parts.length-1];
+ //        for (uint i = 0; i < parts.length; i++) {                              
+ //        	string memory token = parts[i];
+ //        	if(bytes(token)=="")
+ //        }
+		
+	// }
+
+	string private STR = "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47";
+
+
+	function testCall()
+        public view returns (string memory){
+        	return STR;
+        }
+
+
 
 }
