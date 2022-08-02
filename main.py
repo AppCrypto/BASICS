@@ -58,7 +58,7 @@ ctt = wb3.eth.contract(
 from random import randint
 from past.builtins import long
 import py_ecc.bn128
-from py_ecc import bn128
+from py_ecc import bn128 
 from py_ecc.bn128 import add, multiply, curve_order, G1,G2,pairing,neg
 # from py_ecc.bn128.bn128_field_elements import inv, field_modulus, FQ
 
@@ -98,10 +98,25 @@ def simulateKeyGen(attr, alpha, beta, d, PK):
    EK0=add(add(A,B),C)
    EK1=multiply(G2, d)
    EK2=multiply(G1, d)
+   print(type(EK0),EK0)
    return (EK0,EK1,EK2)
 
+ts=time.time()
 EK0,EK1,EK2=simulateKeyGen(attr, alpha, beta, d, PK)
+print("simulateKeyGen",time.time()-ts)
 
+def getKey(EK0,EK1,EK2,y):   
+   K0=add(EK0, multiply(PK, curve_order-y+1))
+   K1=EK1
+   K2=EK2
+   return (K0,K1,K2)
+
+ts=time.time()
+getKey(EK0,EK1,EK2,SK)
+print("getKey",time.time()-ts)
+
+
+ts=time.time()
 alphap=randint(1, curve_order - 1)
 betap=randint(1, curve_order - 1)
 dp=randint(1, curve_order - 1)
@@ -114,6 +129,8 @@ w2=betap + c*beta % curve_order
 w3=dp + c*d % curve_order
 
 tmp=[c,w1,w2,w3]
+
+print("genproofs",time.time()-ts)
 def checkKey0(PK, EK0, EK0p, tmp, gid, attr):
    A=multiply(PK, tmp[1])
    B=multiply(hash2G1(gid.encode()), tmp[2])
@@ -147,11 +164,46 @@ ret = ctt.functions.checkKey1(G2ToArr(EK1), G2ToArr(EK1p), G1ToArr(EK2), G1ToArr
 print("checkKey1:",ret)
 
 
-gas_estimate = ctt.functions.testCall().estimateGas()
-print("Sending transaction to testCall ",gas_estimate)
-# ret = ctt.functions.testCall().transact({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
-ret = ctt.functions.testCall().call({"from":wb3.eth.accounts[1], 'gas': 500_000_000})
-print("testCall:",ret)
+# gas_estimate = ctt.functions.testCall().estimateGas()
+# print("Sending transaction to testCall ",gas_estimate)
+# # ret = ctt.functions.testCall().transact({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
+# ret = ctt.functions.testCall().call({"from":wb3.eth.accounts[1], 'gas': 500_000_000})
+# print("testCall:",ret)
+
+
+
+gas_estimate = ctt.functions.Expect("gid",111).estimateGas()
+print("Sending transaction to Expect ",gas_estimate)
+ret = ctt.functions.Expect("gid",111).transact({"from":wb3.eth.accounts[0], 'gas': 500_000_000})
+print("Expect:",ret)
+
+
+
+gas_estimate = ctt.functions.Deposit("gid").estimateGas({"from":wb3.eth.accounts[0], 'gas': 500_000_000,'value':1111})
+print("Sending transaction to Deposit ",gas_estimate)
+ret = ctt.functions.Deposit("gid").transact({"from":wb3.eth.accounts[0], 'gas': 500_000_000,'value':1111})
+print("Deposit:",ret)
+
+
+
+
+gas_estimate = ctt.functions.Withdraw("gid").estimateGas()
+print("Sending transaction to Withdraw ",gas_estimate)
+# ret = ctt.functions.Withdraw("gid").call()
+# print("Withdraw:",ret)
+   
+
+aas=[]
+for i in range(2, 3):
+   aas.append(wb3.eth.accounts[i])
+
+gas_estimate = ctt.functions.Reward(wb3.eth.accounts[0], wb3.eth.accounts[1], aas, "gid").estimateGas()
+print("Sending transaction to Reward ",gas_estimate)
+ret = ctt.functions.Reward(wb3.eth.accounts[0], wb3.eth.accounts[1], aas, "gid").call()
+print("Reward:",ret)
+
+
+
 
 
 

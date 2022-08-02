@@ -285,7 +285,7 @@ contract Contract
 //         uint256 pt1yx, uint256 pt1yy,
 //         uint256 pt2xx, uint256 pt2xy,
 //         uint256 pt2yx, uint256 pt2yy
-//     ) public view returns (
+//     ) public payable returns (
 //         uint256, uint256,
 //         uint256, uint256
 //     ) {
@@ -358,7 +358,7 @@ contract Contract
 //         uint256 s,
 //         uint256 pt1xx, uint256 pt1xy,
 //         uint256 pt1yx, uint256 pt1yy
-//     ) public view returns (
+//     ) public payable returns (
 //         uint256, uint256,
 //         uint256, uint256
 //     ) {
@@ -691,7 +691,7 @@ contract Contract
 	    return uint256(keccak256(abi.encodePacked(pubkey[0], pubkey[1], kG.X, kG.Y, message)));
 	}
 	
-	function HashToG1(string memory str) public view returns (G1Point memory){
+	function HashToG1(string memory str) public payable returns (G1Point memory){
 		
 		return g1mul(P1(), uint256(keccak256(abi.encodePacked(str))));
 	}
@@ -699,7 +699,7 @@ contract Contract
 	function checkKey0( uint256[2] memory PKArr, uint256[2] memory EK0Arr, 
 		uint256[2] memory EK0pArr, 
  	 	uint256[4] memory tmp, string memory gid, string memory attr)
-	    public view
+	    public payable
 	    returns (bool)
 	{
 		G1Point memory PK=G1Point(PKArr[0], PKArr[1]);
@@ -720,7 +720,7 @@ contract Contract
 	    return true;
 	}
 
-	function negate(G1Point memory p) public view returns (G1Point memory) {
+	function negate(G1Point memory p) public payable returns (G1Point memory) {
         // The prime q in the base field F_q for G1
         uint q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         if (p.X == 0 && p.Y == 0)
@@ -730,7 +730,7 @@ contract Contract
 
 
 	function checkKey1(uint256[2][2] memory EK1Arr, uint256[2][2] memory EK1pArr, uint256[2] memory EK2Arr,  uint256[2] memory EK2pArr, uint256[4] memory tmp)
-	    public view
+	    public payable
 	    returns (bool)
 	{
 		G1Point memory EK2=G1Point(EK2Arr[0], EK2Arr[1]);
@@ -786,10 +786,54 @@ contract Contract
 
 
 	function testCall()
-        public view returns (string memory){
+        public payable returns (string memory){
         	return STR;
         }
 
+
+    mapping (string => uint256) public expects;
+    mapping (address => mapping(string => uint256)) public pool;
+    function Expect(string memory GID, uint256 ownerVal)
+	    public payable
+	    returns (bool)
+	{
+		expects[GID]=ownerVal;
+	    return true;
+	}
+	function Deposit(string memory GID)
+	    public payable
+	    returns (bool)
+	{
+		pool[msg.sender][GID]=msg.value;
+	    return true;
+	}
+
+	function Withdraw(string memory GID)
+	    public payable
+	    returns (bool)
+	{
+		require(pool[msg.sender][GID]>0, "NO deposits in pool");
+		payable(msg.sender).transfer(pool[msg.sender][GID]);
+		pool[msg.sender][GID]=0;
+	    return true;
+	}
+
+	function Reward(address addrU, address addrO, address[] memory addrsAA, string memory GID)
+	    public payable
+	    returns (bool)
+	{
+		address payable addru = payable(addrU);
+		address payable addro = payable(addrO);
+		require(pool[addru][GID]>expects[GID],"NO deposits in pool");
+		addro.transfer(expects[GID]);
+		pool[addru][GID]=pool[addru][GID]-expects[GID];
+		for(uint8 i=0;i<addrsAA.length;i++){
+			address payable addraa = payable(addrsAA[i]);
+			addraa.transfer(pool[addru][GID]/addrsAA.length);	
+		}
+		
+	    return true;
+	}
 
 
 }
