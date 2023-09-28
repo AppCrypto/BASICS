@@ -4,6 +4,7 @@ from charm.toolbox.pairinggroup import *
 from newsecretutils import Utils
 from charm.toolbox.ABEncMultiAuth import ABEncMultiAuth
 import re,sys
+import matplotlib.pyplot as plt
 # from newjson import ElementEncoder, ElementDecoder
 import newjson
 import queue
@@ -146,9 +147,9 @@ class MaabeRW15(ABEncMultiAuth):
         :return: The encrypted message.
         """
         s = self.group.random()  # secret to be shared
-        
+
         w = self.group.init(ZR, 0)  # 0 to be shared
-        
+
 
         policy = self.util.createPolicy(policy_str)
         attribute_list = self.util.getAttributeList(policy)
@@ -178,6 +179,7 @@ class MaabeRW15(ABEncMultiAuth):
         # return {'policy': policy_str, 'C0': C0, 'C1': C1, 'C2': C2, 'C3': C3, 'C4': C4}
 
         return {'policy': policy_str, 'C0': C0, 'C1': C1, 'C2': C2, 'C3': C3, 'C4': C4}
+
     def decrypt(self, gp, sk, ct):
         """
         Decrypt the ciphertext using the secret keys of the user.
@@ -212,57 +214,139 @@ class MaabeRW15(ABEncMultiAuth):
 
 
 
-
 if __name__ == '__main__':
+    from charm.core.math.pairing import pairing, pc_element, ZR, G1, G2, GT, init, pair
+    group = PairingGroup('SS512')
+    maabe = MaabeRW15(group)
+    MaxNode = int(input("输入你期待的权威中心个数："))
+#权限机构集
+    Autoritys = ['UT', 'OU', 'HN', 'OT']
+#GID测试组
+    GID = ['Alice', 'Bob', 'John', 'Emily', 'David', 'Sarah', 'Michael', 'Olivia', 'Daniel', 'Sophia']
+#设定不同的访问控制策略
+    access_policy1 = '(2 of (STUDENT@UT, PROFESSOR@UT, (PHD2@UT or PHD@UT))) and (STUDENT@OU or MASTERS@OU or PROFESSOR@OU)'
+    access_policy2 = '(2 of (STUDENT@UT, PROFESSOR@UT, (XXXX@UT or PHD@UT))) and (STUDENT@OU or MASTERS@OU or STUDENT@OU)'
+    access_policy3 = '((2 of (STUDENT@UT, (XXXX@UT or PHD@UT))) and (STUDENT@OU or MASTERS@OU or STUDENT@HN)) or PROFESSOR@HN)'
+    access_policy4 = '(1 of (STUDENT@UT, (XXXX@UT or PHD@UT))) and (STUDENT@OU or MASTERS@OU or PROFESSOR@OU) or STUDENT@UT)'
+    access_policys = [access_policy1, access_policy2, access_policy3, access_policy4]
+#设定不同权威机构的属性集
+    user_attributes1 = ['STUDENT@UT', 'PHD@UT', 'PHD2@UT']  # user_attributes1 = ['k@node1']
+    user_attributes2 = ['STUDENT@OU']  # user_attributes2 = ['k@node2']
+    user_attributes3 = ['STUDENT@HN', 'PROFESSOR@HN']
+    user_attributes4 = ['STUDENT@OT', 'PROFESSOR@OT']
+    user_attributess = [user_attributes1, user_attributes2, user_attributes3,user_attributes4]
+
+# 指定权威机构的数量下，各部分的时间开销
+    time_au_getkeys = [None] * len(GID)
+    time_user_getkeys = [None] * len(GID)
+    time_enc = [None] * len(GID)
+    time_dec = [None] * len(GID)
+    global size_public_keys
+    global size_CT
+    global size_user_keys
+    global size_EK
+    global size_message
+    global user_keys
+    Public_keys = [None] * MaxNode
+    Secret_keys = [None] * MaxNode
+    User_keys = [None] * MaxNode
+
+    for access_policy in access_policys:
+        for gid_n in range(len(GID)):
+            public_parameters = maabe.setup()  # 初始化global setup，返回全局公共参数public_parameters
+            t = time.perf_counter()
+            for Nindex in range(0, MaxNode):
+                (Public_keys[Nindex], Secret_keys[Nindex]) = maabe.authsetup(public_parameters, Autoritys[Nindex])  # 节点UT作为权限授予中心，执行setup，返回公私钥对(pk,sk)
+            time_au_getkeys[gid_n] = time.perf_counter() - t
+            public_keys = {}
+            # t3 = time.perf_counter() - t
+            for Rindex in range(0, MaxNode):
+                public_keys.update({Autoritys[Rindex]: Public_keys[Rindex]})
+            # print(public_keys)
+            # print(public_key1,'\n',secret_key1)
+            size_public_keys = sys.getsizeof(Public_keys)
+            # print(" size of public_keys in bytes: ", size_public_keys)
+
+            # Create a random message
+            message = group.random(GT)  # t_0时刻, 各节点（以节点i为例）生成随机数Mi
+            size_message = sys.getsizeof(message)
+            # message2 =group.random(GT) # t_0时刻, 各节点（以节点i为例）生成随机数Mi
+            # Encrypt the message
+            # access_policy = '(2 of (STUDENT@UT, PROFESSOR@UT, (XXXX@UT or PHD@UT))) and (STUDENT@OU or MASTERS@OU or PROFESSOR@OU)'
+            # t_0时刻, 构造 access_policy = '(t of (k@node1, k@node2, ... k@nodeN))'
+            t = time.perf_counter()
+            # print(public_keys)
+            cipher_text = maabe.encrypt(public_parameters, public_keys, message, access_policy)  # t_0时刻, 各节点（以节点i为例）生成CTi
+            size_CT = sys.getsizeof(cipher_text)
+            time_enc[gid_n] = time.perf_counter() - t
+            t = time.perf_counter()
+            t = time.perf_counter()
+            for i in range(MaxNode):
+                User_keys[i] = maabe.multiple_attributes_keygen(public_parameters, Secret_keys[i], GID[gid_n],user_attributess[i])
+            time_user_getkeys[gid_n] = time.perf_counter() - t
+            # print(User_keys[i])  # node1生成的密钥key1,t2~t3广播
+            size_EK = sys.getsizeof(User_keys[1])
+            # user_keys2 = maabe.multiple_attributes_keygen(public_parameters, Secret_keys[1], gid,user_attributes2)  # node2生成的密钥key2,t2~t3广播
+            user_keys = {'GID': GID[gid_n], 'keys': merge_dicts(*User_keys)}  # t3时刻 各节点合成当前轮次的私钥key_k
+            size_user_keys = sys.getsizeof(user_keys)
+
+            # Decrypt the message
+            t = time.perf_counter()
+            decrypted_message = maabe.decrypt(public_parameters, user_keys, cipher_text)  # t3时刻，解密得到[Mi]
+            time_dec[gid_n] = time.perf_counter() - t
+            size_decrypted_mes = sys.getsizeof(decrypted_message)
+            if decrypted_message != message:
+                # 执行某些操作
+                break
+
+
+            # print(f'\n公共参数:{t1:.8f}s\n', f'解密:{t_dec:.8f}s\n', f'加密:{t_enc:.8f}s')
+            # print(decrypted_message == message)
+        # print(time_dec)ave_dec_time =  sum(time_dec) / len(time_dec)
+        print('在授权机构数量为{}时'.format(MaxNode), '在访问策略{}下'.format(access_policy), f'\nAU产生密钥:{(sum(time_au_getkeys) / len(time_au_getkeys)):.8f}s\n', f'加密时间:{(sum(time_enc) / len(time_enc)):.8f}s\n', f'用户获取密钥:{(sum(time_user_getkeys) / len(time_user_getkeys)):.8f}s\n', f'解密时间:{(sum(time_dec) / len(time_dec)):.8f}s\n')
+        print('公钥组:', size_public_keys, '\n秘密：', size_message, "\n密文:", size_CT, '\n单组EK：', size_EK, '\n解密密钥组：', size_user_keys, '\n')
+        print(User_keys[1])
+        print(user_keys)
+        print('此伦已经结束\n')
+
+
+'''
+    def measure_time(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"{func.__name__} 执行时间: {execution_time} 秒")
+            return result
+        return wrapper
+
+    def get_object_size(obj):
+        return sys.getsizeof(obj)
+'''
+
+'''if __name__ == '__main__':
 
     group = PairingGroup('SS512')
     maabe = MaabeRW15(group)
+    MaxNode = input("输入你期待的权威中心个数：")
+    Autoritys = ['UT','OU','HN','OT']
     public_parameters = maabe.setup() # 初始化global setup，返回全局公共参数public_parameters
+    #print(f'耗时:{t1:.8f}s')
+    #t1 = time.perf_counter()-t
     from charm.core.math.pairing import pairing, pc_element, ZR, G1, G2, GT, init, pair
-    message2 = pair(group.random(G1),group.random(G2))
-    
-    # a=group.random(G1)
-    # b=group.random(G1)
 
-    # a2=group.random(G2)
-    # b2=group.random(G2)
-
-
-    # a3=group.random(G2)
-    # b3=group.random(G2)
-
-    # ts= time.time()
-    # c= a+b
-    # print("G1+", time.time()-ts)
-    # ts=time.time()
-    # c=a**group.random()
-    # print("G1*", time.time()-ts)
-
-    # ts= time.time()
-    # c= a2+b2
-    # print("G2+", time.time()-ts)
-    # ts=time.time()
-    # c=c**group.random()
-    # print("G2*", time.time()-ts)
-
-    # ts= time.time()
-    # c= a3+b3
-    # print("GT+", time.time()-ts)
-    # ts=time.time()
-    # c=c**group.random()
-    # print("GT*", time.time()-ts)
-
-
-    # ts= time.time()
-    # pair(a, a2)
-    # print("pairing", time.time()-ts)
-
-    # Setup the attribute authorities
-    attributes1 = ['ONE', 'TWO']
-    attributes2 = ['THREE', 'FOUR']
-    (public_key1, secret_key1) = maabe.authsetup(public_parameters, 'UT') #节点UT作为权限授予中心，执行setup，返回公私钥对(pk,sk)
-    (public_key2, secret_key2) = maabe.authsetup(public_parameters, 'OU') #节点OU作为权限授予中心，执行setup，返回公私钥对(pk,sk)
+    (public_key1, secret_key1) = maabe.authsetup(public_parameters, Autoritys[0]) #节点UT作为权限授予中心，执行setup，返回公私钥对(pk,sk)
+    (public_key2, secret_key2) = maabe.authsetup(public_parameters, Autoritys[1]) #节点OU作为权限授予中心，执行setup，返回公私钥对(pk,sk)
+    #t3 = time.perf_counter() - t
     public_keys = {'UT': public_key1, 'OU': public_key2} # pk通过P2P网络共享后，收到的pk集合
+    #print(public_key1,'\n',secret_key1)
+    size_public_keys = sys.getsizeof(public_keys)
+    print(" size of public_keys in bytes: ", size_public_keys)
+    t_public_keys = time.perf_counter() - t
+    #print(t1,t2,t3)
+    #user_keys1_size = maabe.get_object_size(public_key1)
+    #print(f"secret_key1 尺寸: {public_key1} 字节")
 
         # Setup a user and give him some keys
     gid = "bob" # The global user identifier 用作标记轮次？
@@ -271,22 +355,38 @@ if __name__ == '__main__':
 
             # Create a random message
     message = group.random(GT) # t_0时刻, 各节点（以节点i为例）生成随机数Mi
+    size_message = sys.getsizeof(message)
     # message2 =group.random(GT) # t_0时刻, 各节点（以节点i为例）生成随机数Mi
     # Encrypt the message
     access_policy = '(2 of (STUDENT@UT, PROFESSOR@OU, (XXXX@UT or PHD@UT))) and (STUDENT@UT or MASTERS@OU)'
     # t_0时刻, 构造 access_policy = '(t of (k@node1, k@node2, ... k@nodeN))'
+    t = time.perf_counter()
     cipher_text = maabe.encrypt(public_parameters, public_keys, message, access_policy) # t_0时刻, 各节点（以节点i为例）生成CTi
-    
+    size_cipher_text = sys.getsizeof(cipher_text)
+    t_enc = time.perf_counter()-t
+
+    t = time.perf_counter()
     user_keys1 = maabe.multiple_attributes_keygen(public_parameters, secret_key1, gid, user_attributes1) # node1生成的密钥key1,t2~t3广播
+    size_EK = sys.getsizeof(user_keys1)
     user_keys2 = maabe.multiple_attributes_keygen(public_parameters, secret_key2, gid, user_attributes2) # node2生成的密钥key2,t2~t3广播
     user_keys = {'GID': gid, 'keys': merge_dicts(user_keys1, user_keys2)} # t3时刻 各节点合成当前轮次的私钥key_k
+    t_get_user_keys = time.perf_counter()-t
+
+
 
 
             # Decrypt the message
+    t = time.perf_counter()
     decrypted_message = maabe.decrypt(public_parameters, user_keys, cipher_text) #t3时刻，解密得到[Mi]
-    print(decrypted_message == message)
+    t_dec = time.perf_counter()-t
+    size_decrypted_mes = sys.getsizeof(decrypted_message)
 
+    #print(f'\n公共参数:{t1:.8f}s\n',f'解密:{t_dec:.8f}s\n',f'加密:{t_enc:.8f}s')
+    print('公钥组:',size_public_keys,"\n密文:",size_cipher_text,'\n单组EK：',size_EK,'\n秘密：',size_message,'\n解密后秘密：',size_decrypted_mes)
+    print(decrypted_message == message)
+'''
 # import time,sys
+'''
 if __name__ == '__main__':
 
     maxNode = int(sys.argv[1])
@@ -307,7 +407,7 @@ if __name__ == '__main__':
     report = {}
 
     for nodeNum in range(2, maxNode):
-        t = nodeNum/2
+        t = nodeNum/2     #0~maxNode/2
         rIndex = "%d-%d" % (t,nodeNum)
         report[rIndex] = {}
         message = group.random(GT)
@@ -349,3 +449,4 @@ if __name__ == '__main__':
         print(decrypted_message == message)
     open("maabe_report.json","w").write(newjson.dumps(report))
     print(report)
+'''
