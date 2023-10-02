@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/rand"
 	"example.com/m/abe"
-	"example.com/m/bn128"
 	"fmt"
-	//"github.com/fentec-project/bn256"
+	"github.com/fentec-project/bn256"
+
 	//"github.com/fentec-project/gofe/abe"
 	"strconv"
 	"time"
@@ -14,7 +14,7 @@ import (
 func main() {
 	maabe := abe.NewMAABE()
 	maabe.Test()
-	const n int = 1000
+	const n int = 500
 	//t := 10
 	attribs := [n][]string{}
 	auths := [n]*abe.MAABEAuth{}
@@ -38,7 +38,10 @@ func main() {
 	}
 	policyStr += "auth" + strconv.Itoa(n-1) + ":at1"
 	//msp, err := abe.BooleanToMSP("auth1:at1 AND auth2:at1 AND auth3:at1 AND auth4:at1", false)
-
+	msp, err := abe.BooleanToMSP(policyStr, false)
+	if err != nil {
+		fmt.Println("Failed to generate the policy: %v\n", err)
+	}
 	// define the set of all public keys we use
 	pks := []*abe.MAABEPubKey{}
 	for i := 0; i < n; i++ {
@@ -57,9 +60,8 @@ func main() {
 	startts := time.Now().UnixNano() / 1e3
 	var ct *abe.MAABECipher
 	// encrypt the message with the decryption policy in msp
-	_, symKey, _ := bn128.RandomGT(rand.Reader)
+	_, symKey, _ := bn256.RandomGT(rand.Reader)
 	msg := symKey
-	msp, _ := abe.BooleanToMSP(policyStr, false)
 	for i := 0; i < 100; i++ {
 		ct, _ = maabe.Encrypt2(symKey, msp, pks)
 	}
@@ -82,13 +84,12 @@ func main() {
 		ks1 = append(ks1, keys[i][0])
 	}
 	startts = time.Now().UnixNano() / 1e3
-	var msg1 *bn128.GT
+	var msg1 *bn256.GT
 	for i := 0; i < 100; i++ {
 		msg1, _ = maabe.Decrypt2(ct, ks1)
 	}
 	endts = time.Now().UnixNano() / 1e3
 	fmt.Printf("%d nodes decrypt time cost: %v μs\n", n, (endts-startts)/100)
-	fmt.Println(msg.String() == msg1.String())
-	//fmt.Println(msg1)
+	fmt.Println(msg1 == msg)
 
 }
