@@ -236,6 +236,17 @@ type MAABECipher struct {
 	Iv     []byte // initialization vector for symmetric encryption
 }
 
+func (a *MAABECipher) String() string {
+	res := ""
+	res += a.C0.String()
+	for one := range a.C1x {
+		res += a.C1x[one].String()
+		res += a.C2x[one].String()
+		res += a.C3x[one].String()
+	}
+
+	return res
+}
 func (a *MAABE) Test() {
 	//var tmpGT *bn256.GT
 	max := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -437,6 +448,14 @@ type MAABEKey struct {
 	Key    *bn128.G1
 }
 
+func (a *MAABEKey) String() string {
+	res := ""
+	res += a.Gid
+	res += a.Attrib
+	res += a.Key.String()
+	return res
+}
+
 // GenerateAttribKeys generates a list of attribute keys for the given user
 // (represented by its Global ID) that possesses the given list of attributes.
 // In case of a failed procedure an error is returned. The relevant authority
@@ -574,6 +593,7 @@ func (a *MAABE) Decrypt(ct *MAABECipher, ks []*MAABEKey) (string, error) {
 }
 
 func (a *MAABE) Encrypt2(msg *bn128.GT, msp *MSP, pks []*MAABEPubKey) (*MAABECipher, error) {
+
 	// sanity checks
 	if len(msp.Mat) == 0 || len(msp.Mat[0]) == 0 {
 		return nil, fmt.Errorf("empty msp matrix")
@@ -629,7 +649,6 @@ func (a *MAABE) Encrypt2(msg *bn128.GT, msp *MSP, pks []*MAABEPubKey) (*MAABECip
 	for i, at := range msp.RowToAttrib {
 		omega[at] = omegaI[i]
 	}
-	startts := time.Now().UnixNano() / 1e3
 	// calculate ciphertext
 	c0 := new(bn128.GT).Add(msg, new(bn128.GT).ScalarMult(a.Gt, s))
 	c1 := make(map[string]*bn128.GT)
@@ -649,6 +668,7 @@ func (a *MAABE) Encrypt2(msg *bn128.GT, msp *MSP, pks []*MAABEPubKey) (*MAABECip
 		foundPK := false
 		for _, pk := range pks {
 			if pk.EggToAlpha[at] != nil {
+
 				// CAREFUL: negative numbers do not play well with ScalarMult
 				signLambda := lambda[at].Cmp(big.NewInt(0))
 				signOmega := omega[at].Cmp(big.NewInt(0))
@@ -668,7 +688,6 @@ func (a *MAABE) Encrypt2(msg *bn128.GT, msp *MSP, pks []*MAABEPubKey) (*MAABECip
 				c2[at] = new(bn128.G2).ScalarMult(a.G2, r[at])
 				c3[at] = new(bn128.G2).Add(new(bn128.G2).ScalarMult(pk.GToY[at], r[at]), tmpOmega)
 				foundPK = true
-				//fmt.Println(at, pk)
 				break
 			}
 		}
@@ -676,11 +695,7 @@ func (a *MAABE) Encrypt2(msg *bn128.GT, msp *MSP, pks []*MAABEPubKey) (*MAABECip
 			return nil, fmt.Errorf("attribute not found in any pubkey")
 		}
 	}
-	endts := time.Now().UnixNano() / 1e3
-	if startts == endts {
-		fmt.Printf("encrypt time cost: %v μs\n", (endts - startts))
-	}
-
+	//fmt.Println(res)
 	return &MAABECipher{
 		C0:  c0,
 		C1x: c1,
