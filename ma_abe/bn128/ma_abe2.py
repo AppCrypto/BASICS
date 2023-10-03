@@ -229,7 +229,7 @@ if __name__ == '__main__':
 
     maabe = MaabeRW15()
     gp = maabe.setup()
-    MaxNode = int(input("输入期待参与的权威中心个数："))
+    MaxNode = int(sys.argv[1])
 
     t=MaxNode
     public_keys = {}
