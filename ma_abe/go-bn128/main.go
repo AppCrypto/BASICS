@@ -14,7 +14,7 @@ import (
 func main() {
 	maabe := abe.NewMAABE()
 	maabe.Test()
-	const n int = 100
+	const n int = 10
 	const times int64 = 100
 	//t := 10
 	attribs := [n][]string{}
@@ -63,12 +63,13 @@ func main() {
 	gid := "gid1"
 
 	startts = time.Now().UnixNano() / 1e3
-	var key []*abe.MAABEKey
+	//var key []*abe.MAABEKey
 	for i := 0; i < int(times); i++ {
-		key, _ = auths[0].GenerateAttribKeys(gid, attribs[0])
+		//var key []*abe.MAABEKey
+		_, _ = auths[0].GenerateAttribKeys(gid, attribs[0])
 	}
 	endts = time.Now().UnixNano() / 1e3
-	fmt.Printf("%d nodes keygen time cost: %v μs key size:%v B\n", n, (endts-startts)/times, len(key[0].String()))
+	fmt.Printf("%d nodes keygen time cost: %v μs \n", n, 2*(endts-startts)/times) //*2 due to LW CP-ABE
 	for i := 0; i < n; i++ {
 		keys[i], _ = auths[i].GenerateAttribKeys(gid, attribs[i])
 		ks1 = append(ks1, keys[i][0])

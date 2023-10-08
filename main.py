@@ -91,6 +91,17 @@ beta=randint(1, curve_order - 1)
 d=randint(1, curve_order - 1)
 SK=randint(1, curve_order - 1)
 PK=multiply(G1, SK)
+def KeyGen(attr, alpha, beta, d, PK):
+   A=multiply(PK, alpha)
+   B=multiply(hash2G1(gid.encode()), beta)
+   C=multiply(hash2G1(attr.encode()), d)
+   EK0=add(add(A,B),C)
+   EK1=multiply(G2, d)
+   # EK2=multiply(G1, d)
+   
+   return (EK0,EK1)
+
+
 def simulateKeyGen(attr, alpha, beta, d, PK):
    A=multiply(PK, alpha)
    B=multiply(hash2G1(gid.encode()), beta)
@@ -147,6 +158,7 @@ def checkKey1(EK1, EK1p, EK2, EK2p, tmp):
    # print(G2,EK2,EK1,G1)
    assert(pairing(G2,EK2)==pairing(EK1,G1))
 
+print("key size",len(str(KeyGen(attr, alpha, beta, d, PK))),"encrypted key and proofs size:", len(str([PK, EK0, EK0p, tmp, gid, attr, EK1, EK1p, EK2, EK2p])))
 # checkKey0(PK, EK0, EK0p, [c, w1, w2, w3], gid, attr)
 # checkKey1(EK1, EK1p, EK2, EK2p, tmp)   
 # # print(c,w1)
