@@ -64,11 +64,6 @@ from py_ecc.bn128 import add, multiply, curve_order, G1,G2,pairing,neg
 
 from sha3 import keccak_256
 
-# def hashs(*x):
-#     data = b''.join(map(tobe256, x))
-#     return bytes_to_int(keccak_256(data).digest())
-
-
 print(int(keccak_256("data".encode()).hexdigest(),16))
 def hash2G1(data):
    return multiply(G1, int(keccak_256(data).hexdigest(),16))

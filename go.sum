@@ -52,6 +52,10 @@ github.com/ethereum/go-ethereum v1.14.5 h1:szuFzO1MhJmweXjoM5nSAeDvjNUH3vIQoMzzQ
 github.com/ethereum/go-ethereum v1.14.5/go.mod h1:VEDGGhSxY7IEjn98hJRFXl/uFvpRgbIIf2PpXiyGGgc=
 github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 h1:KrE8I4reeVvf7C1tm8elRjj4BdscTYzz/WAbYyf/JI4=
 github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0/go.mod h1:D9AJLVXSyZQXJQVk8oh1EwjISE+sJTn2duYIZC0dy3w=
+github.com/fentec-project/bn256 v0.0.0-20190726093940-0d0fc8bfeed0 h1:mkWVpEiA+MMlWxElUXRqTVSH9eETZvqJ21NZTaDaMiI=
+github.com/fentec-project/bn256 v0.0.0-20190726093940-0d0fc8bfeed0/go.mod h1:llEBqR6SDQxLj2lH10BjIYPrcoqDAFv6mhsqvHfIzlI=
+github.com/fentec-project/gofe v0.0.0-20220829150550-ccc7482d20ef h1:9p5/l5zk8UkCKpK1JHna7oWjWl2xi1o0lfWw7YAmrio=
+github.com/fentec-project/gofe v0.0.0-20220829150550-ccc7482d20ef/go.mod h1:L8BwMRmIIEVQK1Un7rpnuOhex40gk4Quu50C8v34QFc=
 github.com/fjl/memsize v0.0.2 h1:27txuSD9or+NZlnOWdKUxeBzTAUkWCVh+4Gf2dWFOzA=
 github.com/fjl/memsize v0.0.2/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=
 github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4HY=

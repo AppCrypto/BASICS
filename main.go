@@ -2,13 +2,16 @@ package main
 
 import (
 	"basics/compile/contract"
+	"basics/ma_abe/bn128"
 	"basics/utils"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"golang.org/x/crypto/sha3"
 	"log"
 	"math/big"
 )
@@ -16,6 +19,59 @@ import (
 type ACJudge struct {
 	Props []string `json:"props"`
 	ACS   string   `json:"acs"`
+}
+
+// keccak256 computes the Keccak256 hash of the input data.
+func keccak256(data []byte) []byte {
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(data)
+	return hash.Sum(nil)
+}
+
+// hash2G1 hashes the input data to a point on the bn256 G1 curve.
+func hash2G1(data []byte) *bn128.G1 {
+	hash := keccak256(data)
+	intHash := new(big.Int).SetBytes(hash)
+	g1 := new(bn128.G1)
+	g1.ScalarBaseMult(intHash)
+	return g1
+}
+
+// hash2int converts the Keccak256 hash of the input data to an integer.
+func hash2int(data []byte) *big.Int {
+	hash := keccak256(data)
+	intHash := new(big.Int).SetBytes(hash)
+	return intHash
+}
+
+//// G1ToArr converts a G1 point to an array of big integers.
+//func G1ToArr(g *bn128.G1) [2]*big.Int {
+//	x, y := g.Unmarshal()
+//	return [2]*big.Int{x, y}
+//}
+//
+//// G2ToArr converts a G2 point to a nested array of big integers.
+//func G2ToArr(g *bn128.G2) [2][2]*big.Int {
+//	coeffs := g.Unmarshal()
+//	a := G1ToArr(coeffs[0])
+//	b := G1ToArr(coeffs[1])
+//	return [2][2]*big.Int{{a[1], a[0]}, {b[1], b[0]}}
+//}
+
+func testHash2G1() {
+	data := []byte("data")
+
+	// Compute Keccak256 hash
+	hash := keccak256(data)
+	fmt.Println("Keccak256 hash:", hex.EncodeToString(hash))
+
+	// Convert hash to an integer
+	intHash := new(big.Int).SetBytes(hash)
+	fmt.Println("Keccak256 hash as int:", intHash)
+
+	// Hash to G1
+	g1Point := hash2G1(data)
+	fmt.Println("G1 Point:", g1Point)
 }
 
 func main() {

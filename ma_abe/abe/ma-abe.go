@@ -17,11 +17,11 @@
 package abe
 
 import (
+	"basics/ma_abe/bn128"
 	"crypto/aes"
 	cbc "crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
-	"example.com/m/bn128"
 	"fmt"
 
 	"github.com/fentec-project/gofe/data"

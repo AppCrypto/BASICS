@@ -1,9 +1,9 @@
 package main
 
 import (
+	"basics/ma_abe/abe"
+	"basics/ma_abe/bn128"
 	"crypto/rand"
-	"example.com/m/abe"
-	"example.com/m/bn128"
 	"fmt"
 	//"github.com/fentec-project/bn256"
 	//"github.com/fentec-project/gofe/abe"
