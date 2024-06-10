@@ -2,15 +2,16 @@ package main
 
 import (
 	"basics/compile/contract"
-	"basics/ma_abe/bn128"
 	"basics/utils"
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	bn128 "github.com/fentec-project/bn256"
 	"golang.org/x/crypto/sha3"
 	"log"
 	"math/big"
@@ -19,6 +20,17 @@ import (
 type ACJudge struct {
 	Props []string `json:"props"`
 	ACS   string   `json:"acs"`
+}
+
+func randomInt(curveOrder *big.Int) *big.Int {
+	// Generate a random number in [0, curve_order-1]
+	n, err := rand.Int(rand.Reader, curveOrder)
+	if err != nil {
+		panic(err)
+	}
+	// Add 1 to shift to [1, curve_order]
+	n.Add(n, big.NewInt(1))
+	return n
 }
 
 // keccak256 computes the Keccak256 hash of the input data.
@@ -131,5 +143,5 @@ func main() {
 		fmt.Printf("acjudge%s Gas used: %d\n", acjudge, receipt1.GasUsed)
 
 	}
-
+	//curveOrder := bn128.Order
 }

@@ -1,15 +1,20 @@
-package abe_test
+package dabe
 
 import (
-	//"github.com/fentec-project/gofe/abe"
-	"example.com/m/abe"
+	//"basics/crypto/bn128"
+	//"basics/crypto/dabe"
+	"crypto/rand"
+	bn128 "github.com/fentec-project/bn256"
+	lib "github.com/fentec-project/gofe/abe"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestMAABE(t *testing.T) {
 	// create new MAABE struct with Global Parameters
-	maabe := abe.NewMAABE()
+	_, gt, _ := bn128.RandomGT(rand.Reader)
+	KDF(gt)
+	maabe := NewMAABE()
 
 	// create three authorities, each with two attributes
 	attribs1 := []string{"auth1:at1", "auth1:at2"}
@@ -29,13 +34,13 @@ func TestMAABE(t *testing.T) {
 	}
 
 	// create a msp struct out of the boolean formula
-	msp, err := abe.BooleanToMSP("((auth1:at1 AND auth2:at1) OR (auth1:at2 AND auth2:at2)) OR (auth3:at1 AND auth3:at2)", false)
+	msp, err := lib.BooleanToMSP("((auth1:at1 AND auth2:at1) OR (auth1:at2 AND auth2:at2)) OR (auth3:at1 AND auth3:at2)", false)
 	if err != nil {
 		t.Fatalf("Failed to generate the policy: %v\n", err)
 	}
 
 	// define the set of all public keys we use
-	pks := []*abe.MAABEPubKey{auth1.PubKeys(), auth2.PubKeys(), auth3.PubKeys()}
+	pks := []*MAABEPubKey{auth1.PubKeys(), auth2.PubKeys(), auth3.PubKeys()}
 
 	// choose a message
 	msg := "Attack at dawn!"
@@ -52,7 +57,7 @@ func TestMAABE(t *testing.T) {
 	assert.Error(t, err)
 
 	// use a pub keyring that is too small
-	pksSmall := []*abe.MAABEPubKey{auth1.PubKeys()}
+	pksSmall := []*MAABEPubKey{auth1.PubKeys()}
 	_, err = maabe.Encrypt(msg, msp, pksSmall)
 	assert.Error(t, err)
 
@@ -84,11 +89,11 @@ func TestMAABE(t *testing.T) {
 	assert.Error(t, err)
 
 	// user tries to decrypt with different key combos
-	ks1 := []*abe.MAABEKey{key11, key21, key31} // ok
-	ks2 := []*abe.MAABEKey{key12, key22, key32} // ok
-	ks3 := []*abe.MAABEKey{key11, key22}        // not ok
-	ks4 := []*abe.MAABEKey{key12, key21}        // not ok
-	ks5 := []*abe.MAABEKey{key31, key32}        // ok
+	ks1 := []*MAABEKey{key11, key21, key31} // ok
+	ks2 := []*MAABEKey{key12, key22, key32} // ok
+	ks3 := []*MAABEKey{key11, key22}        // not ok
+	ks4 := []*MAABEKey{key12, key21}        // not ok
+	ks5 := []*MAABEKey{key31, key32}        // ok
 
 	// try to decrypt all messages
 	msg1, err := maabe.Decrypt(ct, ks1)
@@ -125,7 +130,7 @@ func TestMAABE(t *testing.T) {
 	foreignKey11 := foreignKeys[0]
 	// join two users who have sufficient attributes together, but not on their
 	// own
-	ks6 := []*abe.MAABEKey{foreignKey11, key21}
+	ks6 := []*MAABEKey{foreignKey11, key21}
 	// try and decrypt
 	_, err = maabe.Decrypt(ct, ks6)
 	assert.Error(t, err)
@@ -152,13 +157,13 @@ func TestMAABE(t *testing.T) {
 		t.Fatalf("Error generating attrib key for regenerated key: %v\n", err)
 	}
 	key12New := keysNew[0]
-	pks = []*abe.MAABEPubKey{auth1.Pk, auth2.Pk, auth3.Pk}
+	pks = []*MAABEPubKey{auth1.Pk, auth2.Pk, auth3.Pk}
 	// reencrypt msg
 	ctNew, err := maabe.Encrypt(msg, msp, pks)
 	if err != nil {
 		t.Fatalf("Failed to encrypt with new keys")
 	}
-	ks7 := []*abe.MAABEKey{key12New, key22}
+	ks7 := []*MAABEKey{key12New, key22}
 	// decrypt reencrypted msg
 	msg7, err := maabe.Decrypt(ctNew, ks7)
 	if err != nil {
