@@ -1,7 +1,8 @@
-package dabe
+package crypto
 
 import (
-	//"basics/crypto/dabe"
+	"basics/crypto/lwdabe"
+	//"basics/crypto/lwdabe"
 	"crypto/rand"
 	"fmt"
 	bn128 "github.com/fentec-project/bn256"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestOp(t *testing.T) {
-	a := NewMAABE()
+	a := lwdabe.NewMAABE()
 	//var tmpGT *bn256.GT
 	max := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, max)

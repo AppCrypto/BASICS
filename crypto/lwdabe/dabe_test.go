@@ -1,8 +1,8 @@
-package dabe
+package lwdabe
 
 import (
 	//"basics/crypto/bn128"
-	//"basics/crypto/dabe"
+	//"basics/crypto/lwdabe"
 	"crypto/rand"
 	bn128 "github.com/fentec-project/bn256"
 	lib "github.com/fentec-project/gofe/abe"
