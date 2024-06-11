@@ -16,6 +16,11 @@ import (
 	"time"
 )
 
+func RandomInt() *big.Int {
+	v, _ := data.NewRandomVector(1, sample.NewUniform(bn128.Order))
+	return v[0]
+}
+
 // MAABE represents a MAABE scheme.
 type MAABE struct {
 	P  *big.Int
@@ -34,6 +39,13 @@ func NewMAABE() *MAABE {
 		G2: gen2,
 		Gt: bn128.Pair(gen1, gen2),
 	}
+}
+func Hash(str string) *big.Int {
+	hash := sha256.New()
+	hash.Write([]byte(str))
+	hashBytes := hash.Sum(nil)
+	hashInt := new(big.Int).SetBytes(hashBytes)
+	return hashInt
 }
 
 func KDF(gt *bn128.GT) []byte {
@@ -60,14 +72,15 @@ type MAABEPubKey struct {
 	//Attribs    []string
 	ID         string
 	EggToAlpha *bn128.GT
-	GToY       *bn128.G2
+	GToBeta    *bn128.G2
+	GToAlpha   *bn128.G1
 }
 
 // MAABESecKey represents a secret key for an authority.
 type MAABESecKey struct {
 	//Attribs []string
 	Alpha *big.Int
-	Y     *big.Int
+	Beta  *big.Int
 }
 
 // MAABEAuth represents an authority in the MAABE scheme.
@@ -82,11 +95,12 @@ type MAABEAuth struct {
 // public and secret keys for the given set of attributes. In case of a failed
 // procedure an error is returned.
 func (a *MAABE) NewMAABEAuth(id string) (*MAABEAuth, error) {
-	v, _ := data.NewRandomVector(2, sample.NewUniform(a.P))
-	alpha := v[0]
-	y := v[1]
-	sk := &MAABESecKey{Alpha: alpha, Y: y}
-	pk := &MAABEPubKey{ID: id, EggToAlpha: new(bn128.GT).ScalarMult(a.Gt, alpha), GToY: new(bn128.G2).ScalarMult(a.G2, y)}
+	//v, _ := data.NewRandomVector(2, sample.NewUniform(a.P))
+	alpha := RandomInt()
+	beta := RandomInt()
+	sk := &MAABESecKey{Alpha: alpha, Beta: beta}
+	//todo check GTOAlpha
+	pk := &MAABEPubKey{ID: id, EggToAlpha: new(bn128.GT).ScalarMult(a.Gt, alpha), GToBeta: new(bn128.G2).ScalarMult(a.G2, beta), GToAlpha: new(bn128.G1).ScalarMult(a.G1, alpha)}
 	return &MAABEAuth{
 		//ID:    id,
 		Maabe: a,
@@ -119,7 +133,7 @@ func (a *MAABECipher) String() string {
 	return res
 }
 
-func (a *MAABE) Encrypt(msg string, msp *lib.MSP, pks []*MAABEPubKey) (*MAABECipher, error) {
+func (a *MAABE) ABEEncrypt(msg string, msp *lib.MSP, pks []*MAABEPubKey) (*MAABECipher, error) {
 	// sanity checks
 	if len(msp.Mat) == 0 || len(msp.Mat[0]) == 0 {
 		return nil, fmt.Errorf("empty msp matrix")
@@ -225,7 +239,7 @@ func (a *MAABE) Encrypt(msg string, msp *lib.MSP, pks []*MAABEPubKey) (*MAABECip
 				}
 				c1[at] = new(bn128.GT).Add(tmpLambda, new(bn128.GT).ScalarMult(pk.EggToAlpha, r[at]))
 				c2[at] = new(bn128.G2).ScalarMult(new(bn128.G2).Neg(a.G2), r[at]) //new(bn128.G2).ScalarMult(a.G2, r[at])
-				c3[at] = new(bn128.G2).Add(new(bn128.G2).ScalarMult(pk.GToY, r[at]), tmpOmega)
+				c3[at] = new(bn128.G2).Add(new(bn128.G2).ScalarMult(pk.GToBeta, r[at]), tmpOmega)
 				F_delta, _ := bn128.HashG1(at)
 				c4[at] = new(bn128.G1).ScalarMult(F_delta, r[at])
 				foundPK = true
@@ -260,6 +274,16 @@ type MAABEKey struct {
 	Attrib   string
 	Key      *bn128.G1
 	KeyPrime *bn128.G2
+	D        *big.Int
+}
+
+type Proof struct {
+	Key      *bn128.G1
+	KeyPrime *bn128.G2
+	c        *big.Int
+	w1       *big.Int
+	w2       *big.Int
+	w3       *big.Int
 }
 
 func (a *MAABEKey) String() string {
@@ -270,18 +294,72 @@ func (a *MAABEKey) String() string {
 	return res
 }
 
-// GenerateAttribKeys generates a list of attribute keys for the given user
-// (represented by its Global ID) that possesses the given list of attributes.
-// In case of a failed procedure an error is returned. The relevant authority
-// has to check that the entity actually possesses the attributes via some
-// other channel.
-func (auth *MAABEAuth) GenerateAttribKeys(gid string, attribs []string) ([]*MAABEKey, error) {
+// KeyGenPrimeAndGenProofs invokes the ABEKeygen' and genProofs in the paper
+func (auth *MAABEAuth) KeyGenPrimeAndGenProofs(enckey *MAABEKey, pku *bn128.G1) (*Proof, error) {
+	alphap, betap, dp := RandomInt(), RandomInt(), RandomInt()
+	key2, _ := auth.ABEKeyGen(enckey.Gid, enckey.Attrib, pku, alphap, betap, dp)
+	c := Hash(enckey.String() + key2.String())
+	w1 := new(big.Int).Add(alphap, new(big.Int).Mul(c, auth.Sk.Alpha))
+	w2 := new(big.Int).Add(betap, new(big.Int).Mul(c, auth.Sk.Beta))
+	w3 := new(big.Int).Add(dp, new(big.Int).Mul(c, enckey.D))
+	//fmt.Println("KeyGenPrimeAndGenProofs", w1, w2, w3, alphap, betap, dp, enckey.D)
+	return &Proof{
+		Key:      key2.Key,
+		KeyPrime: key2.KeyPrime,
+		c:        c,
+		w1:       w1,
+		w2:       w2,
+		w3:       w3,
+	}, nil
+}
+func (auth *MAABEAuth) GetKey(enckey *MAABEKey, userSk *big.Int) *MAABEKey {
+	fmt.Println("GetKey", new(bn128.G1).Add(enckey.Key, new(bn128.G1).Neg(new(bn128.G1).ScalarMult(auth.Pk.GToAlpha, new(big.Int).Sub(userSk, big.NewInt(1))))))
+	return &MAABEKey{
+		Gid:      enckey.Gid,
+		Attrib:   enckey.Attrib,
+		Key:      new(bn128.G1).Add(enckey.Key, new(bn128.G1).Neg(new(bn128.G1).ScalarMult(auth.Pk.GToAlpha, new(big.Int).Sub(userSk, big.NewInt(1))))),
+		KeyPrime: enckey.KeyPrime,
+		D:        big.NewInt(0),
+	}
+}
+
+// CheckKey cheks whether the enckey is correct or not
+func (abe *MAABE) CheckKey(pku *bn128.G1, enckey *MAABEKey, proof *Proof) (bool, error) {
+	part1 := new(bn128.G1).ScalarMult(pku, proof.w1)
+	hashGID, _ := bn128.HashG1(enckey.Gid)
+	part2 := new(bn128.G1).ScalarMult(hashGID, proof.w2)
+	F_delta, _ := bn128.HashG1(enckey.Attrib)
+	part3 := new(bn128.G1).ScalarMult(F_delta, proof.w3)
+	left1 := new(bn128.G1).Add(part1, part2)
+	left1.Add(part3, left1)
+	//fmt.Println("left1", left1.String())
+	right1 := new(bn128.G1).Add(proof.Key, new(bn128.G1).ScalarMult(enckey.Key, proof.c))
+	//fmt.Println("=======", proof.c, proof.Key, right1, left1)
+	if left1.String() != right1.String() {
+		return false, fmt.Errorf("checkKey first equation fails")
+	}
+	left2 := new(bn128.G2).ScalarMult(abe.G2, proof.w3)
+	right2 := new(bn128.G2).Add(new(bn128.G2).ScalarMult(enckey.KeyPrime, proof.c), proof.KeyPrime)
+	//fmt.Println("=======", left2, right2, proof.KeyPrime, proof.w3)
+	if left2.String() != right2.String() {
+		return false, fmt.Errorf("checkKey second equation fails")
+	}
+	return true, nil
+}
+
+// ABEKeygen generates a key for the given attribute
+func (auth *MAABEAuth) ABEKeyGen(gid string, at string, params ...interface{}) (*MAABEKey, error) {
+	var alpha, beta, d = auth.Sk.Alpha, auth.Sk.Beta, RandomInt()
+	var pt = auth.Maabe.G1 //new(bn128.G1).Set(auth.Maabe.G1)
+	if params != nil && len(params) == 1 {
+		pt = params[0].(*bn128.G1)
+	} else if params != nil && len(params) == 4 {
+		pt = params[0].(*bn128.G1)
+		alpha, beta, d = params[1].(*big.Int), params[2].(*big.Int), params[3].(*big.Int)
+	}
 	// sanity checks
 	if len(gid) == 0 {
 		return nil, fmt.Errorf("GID cannot be empty")
-	}
-	if len(attribs) == 0 {
-		return nil, fmt.Errorf("attribute cannot be empty")
 	}
 	if auth.Maabe == nil {
 		return nil, fmt.Errorf("ma-abe scheme cannot be nil")
@@ -290,35 +368,33 @@ func (auth *MAABEAuth) GenerateAttribKeys(gid string, attribs []string) ([]*MAAB
 	if err != nil {
 		return nil, err
 	}
-	ks := make([]*MAABEKey, len(attribs))
-	for i, at := range attribs {
-		var k *bn128.G1
-		var kp *bn128.G2
-		if auth.Sk.Alpha != nil && auth.Sk.Y != nil {
-			F_delta, _ := bn128.HashG1(at)
-			k = new(bn128.G1).Add(new(bn128.G1).ScalarMult(auth.Maabe.G1, auth.Sk.Alpha), new(bn128.G1).ScalarMult(hash, auth.Sk.Y))
-			v, _ := data.NewRandomVector(1, sample.NewUniform(auth.Maabe.P))
-			k = new(bn128.G1).Add(k, new(bn128.G1).ScalarMult(F_delta, v[0]))
-			kp = new(bn128.G2).ScalarMult(auth.Maabe.G2, v[0])
-			ks[i] = &MAABEKey{
-				Gid:      gid,
-				Attrib:   at,
-				Key:      k,
-				KeyPrime: kp,
-			}
-		} else {
-			return nil, fmt.Errorf("attribute not found in secret key")
-		}
+	ks := new(MAABEKey)
+	//for i, at := range attribs {
+	var k *bn128.G1
+	var kp *bn128.G2
+	if strings.Split(at, ":")[0] != auth.Pk.ID {
+		return nil, fmt.Errorf("the attribute does not belong to the authority")
+	}
+	F_delta, _ := bn128.HashG1(at)
+	k = new(bn128.G1).Add(new(bn128.G1).ScalarMult(pt, alpha), new(bn128.G1).ScalarMult(hash, beta))
+	k = new(bn128.G1).Add(k, new(bn128.G1).ScalarMult(F_delta, d))
+	kp = new(bn128.G2).ScalarMult(auth.Maabe.G2, d)
+	ks = &MAABEKey{
+		Gid:      gid,
+		Attrib:   at,
+		Key:      k,
+		KeyPrime: kp,
+		D:        d,
 	}
 	return ks, nil
 }
 
-// Decrypt takes a ciphertext in a MAABE scheme and a set of attribute keys
+// ABEDecrypt takes a ciphertext in a MAABE scheme and a set of attribute keys
 // belonging to the same entity, and attempts to decrypt the cipher. This is
 // possible only if the set of possessed attributes/keys suffices the
 // decryption policy of the ciphertext. In case this is not possible or
 // something goes wrong an error is returned.
-func (a *MAABE) Decrypt(ct *MAABECipher, ks []*MAABEKey) (string, error) {
+func (a *MAABE) ABEDecrypt(ct *MAABECipher, ks []*MAABEKey) (string, error) {
 	// sanity checks
 	if len(ks) == 0 {
 		return "", fmt.Errorf("empty set of attribute keys")

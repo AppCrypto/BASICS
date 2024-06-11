@@ -4,6 +4,7 @@ import (
 	//"basics/crypto/bn128"
 	//"basics/crypto/lwdabe"
 	"crypto/rand"
+	"fmt"
 	bn128 "github.com/fentec-project/bn256"
 	lib "github.com/fentec-project/gofe/abe"
 	"github.com/stretchr/testify/assert"
@@ -46,46 +47,64 @@ func TestMAABE(t *testing.T) {
 	msg := "Attack at dawn!"
 
 	// encrypt the message with the decryption policy in msp
-	ct, err := maabe.Encrypt(msg, msp, pks)
+	ct, err := maabe.ABEEncrypt(msg, msp, pks)
 	if err != nil {
 		t.Fatalf("Failed to encrypt: %v\n", err)
 	}
 
 	// also check for empty message
 	msgEmpty := ""
-	_, err = maabe.Encrypt(msgEmpty, msp, pks)
+	_, err = maabe.ABEEncrypt(msgEmpty, msp, pks)
 	assert.Error(t, err)
 
 	// use a pub keyring that is too small
 	pksSmall := []*MAABEPubKey{auth1.Pk}
-	_, err = maabe.Encrypt(msg, msp, pksSmall)
+	_, err = maabe.ABEEncrypt(msg, msp, pksSmall)
 	assert.Error(t, err)
 
 	// choose a single user's Global ID
 	gid := "gid1"
-
 	// authority 1 issues keys to user
-	keys1, err := auth1.GenerateAttribKeys(gid, attribs1)
+	key11, err := auth1.ABEKeyGen(gid, attribs1[0])
+	//keys1[1]
 	if err != nil {
 		t.Fatalf("Failed to generate attribute keys: %v\n", err)
 	}
-	key11, key12 := keys1[0], keys1[1]
+	key12, err := auth1.ABEKeyGen(gid, attribs1[1])
+	if err != nil {
+		t.Fatalf("Failed to generate attribute keys: %v\n", err)
+	}
 	// authority 2 issues keys to user
-	keys2, err := auth2.GenerateAttribKeys(gid, attribs2)
+	key21, err := auth2.ABEKeyGen(gid, attribs2[0])
 	if err != nil {
 		t.Fatalf("Failed to generate attribute keys: %v\n", err)
 	}
-	key21, key22 := keys2[0], keys2[1]
+	key22, err := auth2.ABEKeyGen(gid, attribs2[1])
+	if err != nil {
+		t.Fatalf("Failed to generate attribute keys: %v\n", err)
+	}
 	// authority 3 issues keys to user
-	keys3, err := auth3.GenerateAttribKeys(gid, attribs3)
+	//key31, err := auth3.ABEKeyGen(gid, attribs3[0])
+	userSk := RandomInt()
+	userPk := new(bn128.G1).ScalarMult(auth3.Maabe.G1, userSk)
+	key31Enc, _ := auth3.ABEKeyGen(gid, attribs3[0], userPk)
+	proof, err := auth3.KeyGenPrimeAndGenProofs(key31Enc, userPk)
 	if err != nil {
 		t.Fatalf("Failed to generate attribute keys: %v\n", err)
 	}
-	key31, key32 := keys3[0], keys3[1]
-
+	res, err := maabe.CheckKey(userPk, key31Enc, proof)
+	if !res {
+		t.Fatalf("Failed to checkKey attribute keys: %v\n", err)
+	}
+	key31 := auth3.GetKey(key31Enc, userSk)
+	fmt.Println("GetKey", key31Enc.Key)
+	key32, err := auth3.ABEKeyGen(gid, attribs3[1])
+	if err != nil {
+		t.Fatalf("Failed to generate attribute keys: %v\n", err)
+	}
 	// try and generate key for an attribute that does not belong to the
 	// authority (or does not exist)
-	//_, err = auth3.GenerateAttribKeys(gid, []string{"auth3:at3"})
+	//_, err = auth3.KeyGen(gid, []string{"auth3:at3"})
 	//assert.Error(t, err)
 
 	// user tries to decrypt with different key combos
@@ -96,25 +115,24 @@ func TestMAABE(t *testing.T) {
 	ks5 := []*MAABEKey{key31, key32}        // ok
 
 	// try to decrypt all messages
-	msg1, err := maabe.Decrypt(ct, ks1)
+	msg1, err := maabe.ABEDecrypt(ct, ks1)
 	if err != nil {
 		t.Fatalf("Error decrypting with keyset 1: %v\n", err)
 	}
 	assert.Equal(t, msg, msg1)
 
-	msg2, err := maabe.Decrypt(ct, ks2)
+	msg2, err := maabe.ABEDecrypt(ct, ks2)
 	if err != nil {
 		t.Fatalf("Error decrypting with keyset 2: %v\n", err)
 	}
 	assert.Equal(t, msg, msg2)
 
-	_, err = maabe.Decrypt(ct, ks3)
+	_, err = maabe.ABEDecrypt(ct, ks3)
 	assert.Error(t, err)
 
-	_, err = maabe.Decrypt(ct, ks4)
+	_, err = maabe.ABEDecrypt(ct, ks4)
 	assert.Error(t, err)
-
-	msg5, err := maabe.Decrypt(ct, ks5)
+	msg5, err := maabe.ABEDecrypt(ct, ks5)
 	if err != nil {
 		t.Fatalf("Error decrypting with keyset 5: %v\n", err)
 	}
@@ -123,16 +141,16 @@ func TestMAABE(t *testing.T) {
 	// generate keys with a different GID
 	gid2 := "gid2"
 	// authority 1 issues keys to user
-	foreignKeys, err := auth1.GenerateAttribKeys(gid2, []string{"auth1:at1"})
+	foreignKeys, err := auth1.ABEKeyGen(gid2, "auth1:at1")
 	if err != nil {
 		t.Fatalf("Failed to generate attribute key for %s: %v\n", "auth1:at1", err)
 	}
-	foreignKey11 := foreignKeys[0]
+	foreignKey11 := foreignKeys
 	// join two users who have sufficient attributes together, but not on their
 	// own
 	ks6 := []*MAABEKey{foreignKey11, key21}
 	// try and decrypt
-	_, err = maabe.Decrypt(ct, ks6)
+	_, err = maabe.ABEDecrypt(ct, ks6)
 	assert.Error(t, err)
 
 }
