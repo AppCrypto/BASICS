@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"math/rand"
 	"os"
 	"strings"
 
@@ -41,7 +42,7 @@ func Deploy(client *ethclient.Client, contract_name string, auth *bind.TransactO
 	if err != nil {
 		log.Fatalf("Failed to deploy contract: %v", err)
 	}
-	fmt.Printf("Contract deployed! Address: %s\n", address.Hex())
+	fmt.Printf("Basics.sol deployed! Address: %s\n", address.Hex())
 	fmt.Printf("Transaction hash: %s\n", tx.Hash().Hex())
 	return address, tx
 }
@@ -66,7 +67,7 @@ func Transact(client *ethclient.Client, privatekey string, value *big.Int) *bind
 	auth, _ := bind.NewKeyedTransactorWithChainID(key, chainID)
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = value
-	auth.GasLimit = uint64(90071992547)   //gasLimit
+	auth.GasLimit = uint64(900719925)     //gasLimit
 	auth.GasPrice = big.NewInt(200000000) //gasPrice
 	return auth
 }
@@ -77,4 +78,38 @@ func GetENV(key string) string {
 		log.Fatalf("Some error occured. Err: %s", err)
 	}
 	return os.Getenv(key)
+}
+
+func randomOperand(operands []string) (string, []string) {
+	index := rand.Intn(len(operands))
+	operand := operands[index]
+	operands = append(operands[:index], operands[index+1:]...)
+	return operand, operands
+}
+
+func RandomACP(operands []string) string {
+
+	operand1, remainingOperands := randomOperand(operands)
+	operands = remainingOperands
+
+	if len(operands) == 0 {
+		return operand1
+	}
+	operand2, remainingOperands := randomOperand(operands)
+	operands = remainingOperands
+
+	operator := ""
+	if rand.Intn(2) == 0 {
+		operator = " AND "
+	} else {
+		operator = " OR "
+	}
+
+	expression := "(" + operand1 + operator + operand2 + ")"
+
+	if len(operands) > 0 {
+		expression += operator + RandomACP(operands)
+	}
+
+	return expression
 }

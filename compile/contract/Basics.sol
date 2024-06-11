@@ -1,8 +1,8 @@
 pragma solidity ^0.8.0;
-pragma experimental ABIEncoderV2;
+//pragma experimental ABIEncoderV2;
 // import "../contracts/bn128G2.sol";
 //import "../contracts/strings.sol";
-contract Contract
+contract Basics
 {
 	// using bn128G2 for *;
 //	using strings for *;
