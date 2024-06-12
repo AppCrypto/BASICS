@@ -72,8 +72,9 @@ type MAABEPubKey struct {
 	//Attribs    []string
 	ID         string
 	EggToAlpha *bn128.GT
-	GToBeta    *bn128.G2
+	G2ToBeta   *bn128.G2
 	GToAlpha   *bn128.G1
+	G2ToAlpha  *bn128.G2
 }
 
 // MAABESecKey represents a secret key for an authority.
@@ -99,8 +100,8 @@ func (a *MAABE) NewMAABEAuth(id string) (*MAABEAuth, error) {
 	alpha := RandomInt()
 	beta := RandomInt()
 	sk := &MAABESecKey{Alpha: alpha, Beta: beta}
-	//todo check GTOAlpha
-	pk := &MAABEPubKey{ID: id, EggToAlpha: new(bn128.GT).ScalarMult(a.Gt, alpha), GToBeta: new(bn128.G2).ScalarMult(a.G2, beta), GToAlpha: new(bn128.G1).ScalarMult(a.G1, alpha)}
+	//todo check GTOAlpha G2TOAlpha
+	pk := &MAABEPubKey{ID: id, EggToAlpha: new(bn128.GT).ScalarMult(a.Gt, alpha), G2ToBeta: new(bn128.G2).ScalarMult(a.G2, beta), GToAlpha: new(bn128.G1).ScalarMult(a.G1, alpha), G2ToAlpha: new(bn128.G2).ScalarMult(a.G2, alpha)}
 	return &MAABEAuth{
 		//ID:    id,
 		Maabe: a,
@@ -239,7 +240,7 @@ func (a *MAABE) ABEEncrypt(msg string, msp *lib.MSP, pks []*MAABEPubKey) (*MAABE
 				}
 				c1[at] = new(bn128.GT).Add(tmpLambda, new(bn128.GT).ScalarMult(pk.EggToAlpha, r[at]))
 				c2[at] = new(bn128.G2).ScalarMult(new(bn128.G2).Neg(a.G2), r[at]) //new(bn128.G2).ScalarMult(a.G2, r[at])
-				c3[at] = new(bn128.G2).Add(new(bn128.G2).ScalarMult(pk.GToBeta, r[at]), tmpOmega)
+				c3[at] = new(bn128.G2).Add(new(bn128.G2).ScalarMult(pk.G2ToBeta, r[at]), tmpOmega)
 				F_delta, _ := bn128.HashG1(at)
 				c4[at] = new(bn128.G1).ScalarMult(F_delta, r[at])
 				foundPK = true
@@ -278,12 +279,14 @@ type MAABEKey struct {
 }
 
 type Proof struct {
-	Key      *bn128.G1
-	KeyPrime *bn128.G2
-	c        *big.Int
-	w1       *big.Int
-	w2       *big.Int
-	w3       *big.Int
+	G2ToBeta  *bn128.G2
+	G2ToAlpha *bn128.G2
+	Key       *bn128.G1
+	KeyPrime  *bn128.G2
+	c         *big.Int
+	w1        *big.Int
+	w2        *big.Int
+	w3        *big.Int
 }
 
 func (a *MAABEKey) String() string {
@@ -304,12 +307,14 @@ func (auth *MAABEAuth) KeyGenPrimeAndGenProofs(enckey *MAABEKey, pku *bn128.G1) 
 	w3 := new(big.Int).Add(dp, new(big.Int).Mul(c, enckey.D))
 	//fmt.Println("KeyGenPrimeAndGenProofs", w1, w2, w3, alphap, betap, dp, enckey.D)
 	return &Proof{
-		Key:      key2.Key,
-		KeyPrime: key2.KeyPrime,
-		c:        c,
-		w1:       w1,
-		w2:       w2,
-		w3:       w3,
+		G2ToBeta:  auth.Pk.G2ToBeta,
+		G2ToAlpha: auth.Pk.G2ToAlpha,
+		Key:       key2.Key,
+		KeyPrime:  key2.KeyPrime,
+		c:         c,
+		w1:        w1,
+		w2:        w2,
+		w3:        w3,
 	}, nil
 }
 func (auth *MAABEAuth) GetKey(enckey *MAABEKey, userSk *big.Int) *MAABEKey {
@@ -344,6 +349,14 @@ func (abe *MAABE) CheckKey(pku *bn128.G1, enckey *MAABEKey, proof *Proof) (bool,
 	if left2.String() != right2.String() {
 		return false, fmt.Errorf("checkKey second equation fails")
 	}
+
+	left3 := new(bn128.GT).Add(bn128.Pair(pku, proof.G2ToAlpha), bn128.Pair(hashGID, proof.G2ToBeta))
+	left3 = new(bn128.GT).Add(left3, bn128.Pair(F_delta, enckey.KeyPrime))
+	right3 := bn128.Pair(enckey.Key, abe.G2)
+	if left3.String() != right3.String() {
+		return false, fmt.Errorf("checkKey third equation fails")
+	}
+	//if bn128.Pair(abe.G1, proof.G2ToAlpha).String() !=bn128.Pair(proof.G2ToAlpha, abe.G2).String()
 	return true, nil
 }
 
