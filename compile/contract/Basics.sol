@@ -29,6 +29,67 @@ contract Basics
 		uint[2] Y;
 	}
 
+    struct pk_data
+	{
+		uint256[2]  uPKArr;
+		uint256[2][2] APKArr1;
+		uint256[2][2] APKArr2;
+	}
+
+    struct checkkey_Proof
+    {
+        uint256[2]  EK0Arr; 
+        uint256[2][2]  EK1Arr; 
+        uint256[2]  EK2Arr;
+        uint256[2]  EK0pArr; 
+        uint256[2][2] EK1pArr; 
+        uint256[2]  EK2pArr; 
+        uint256[4]  tmp; 
+        string  gid; 
+        string  attr;
+    }
+
+    pk_data private myPKData;
+
+    checkkey_Proof public checkkeyProof;
+
+    function PKtoSC(
+		uint256[2]  memory _uPKArr,
+		uint256[2][2] memory _APKArr1,
+		uint256[2][2] memory _APKArr2
+	) public {
+		myPKData = pk_data({
+			uPKArr: _uPKArr,
+			APKArr1: _APKArr1,
+			APKArr2: _APKArr2
+		});
+	}
+
+    function ProoftoSC(
+        uint256[2]  memory _EK0Arr, 
+        uint256[2][2]  memory _EK1Arr, 
+        uint256[2]  memory _EK2Arr,
+        uint256[2]  memory _EK0pArr, 
+        uint256[2][2] memory _EK1pArr, 
+        uint256[2]  memory _EK2pArr, 
+        uint256[4]  memory _tmp, 
+        string  memory _gid, 
+        string  memory _attr
+    ) public { // instantiate struct and assign value
+        checkkeyProof = checkkey_Proof({
+            EK0Arr: _EK0Arr,
+            EK1Arr: _EK1Arr,
+            EK2Arr: _EK2Arr,
+            EK0pArr: _EK0pArr,
+            EK1pArr: _EK1pArr,
+            EK2pArr: _EK2pArr,
+            tmp: _tmp,
+            gid: _gid,
+            attr: _attr
+        });
+    }
+
+
 	// (P+1) / 4
 	function A() pure internal returns (uint256) {
 		return CURVE_A;
@@ -46,49 +107,6 @@ contract Basics
 	function P1() pure internal returns (G1Point memory) {
 		return G1Point(1, 2);
 	}
-
-	function HashToPoint(uint256 s)
-        internal view returns (G1Point memory)
-    {
-        uint256 beta = 0;
-        uint256 y = 0;
-
-        // XXX: Gen Order (n) or Field Order (p) ?
-        uint256 x = s % GEN_ORDER;
-
-        while( true ) {
-            (beta, y) = FindYforX(x);
-
-            // y^2 == beta
-            if( beta == mulmod(y, y, FIELD_ORDER) ) {
-                return G1Point(x, y);
-            }
-
-            x = addmod(x, 1, FIELD_ORDER);
-        }
-    }
-
-
-    /**
-    * Given X, find Y
-    *
-    *   where y = sqrt(x^3 + b)
-    *
-    * Returns: (x^3 + b), y
-    */
-    function FindYforX(uint256 x)
-        internal view returns (uint256, uint256)
-    {
-        // beta = (x^3 + b) % p
-        uint256 beta = addmod(mulmod(mulmod(x, x, FIELD_ORDER), x, FIELD_ORDER), CURVE_B, FIELD_ORDER);
-
-        // y^2 = x^3 + b
-        // this acts like: y = sqrt(beta)
-        uint256 y = expMod(beta, CURVE_A, FIELD_ORDER);
-
-        return (beta, y);
-    }
-
 
     // a - b = c;
     function submod(uint a, uint b) internal pure returns (uint){
@@ -134,15 +152,6 @@ contract Basics
 			[4082367875863433681332203403145435568316851327593401208105741076214120093531,
 			 8495653923123431417604973247489272438418190587263600148770280649306958101930]
 		);
-	}
-
-	/// return the negation of p, i.e. p.add(p.negate()) should be zero.
-	function g1neg(G1Point memory p) pure internal returns (G1Point memory) {
-		// The prime q in the base field F_q for G1
-		uint q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-		if (p.X == 0 && p.Y == 0)
-			return G1Point(0, 0);
-		return G1Point(p.X, q - (p.Y % q));
 	}
 
 	/// return the sum of two points of G1
@@ -216,23 +225,6 @@ contract Basics
 		return pairing(p1, p2);
 	}
 
-	/// Convenience method for a pairing check for three pairs.
-	function pairingProd3(
-			G1Point memory a1, G2Point memory a2,
-			G1Point memory b1, G2Point memory b2,
-			G1Point memory c1, G2Point memory c2
-	) view internal returns (bool) {
-		G1Point[] memory p1 = new G1Point[](3);
-		G2Point[] memory p2 = new G2Point[](3);
-		p1[0] = a1;
-		p1[1] = b1;
-		p1[2] = c1;
-		p2[0] = a2;
-		p2[1] = b2;
-		p2[2] = c2;
-		return pairing(p1, p2);
-	}
-
 	/// Convenience method for a pairing check for four pairs.
 	function pairingProd4(
 			G1Point memory a1, G2Point memory a2,
@@ -264,61 +256,10 @@ contract Basics
 	) view internal returns (bool) {		
 		return a.X[0]==b.X[0] && a.X[1]==b.X[1] && a.Y[0]==b.Y[0] && a.Y[1]==b.Y[1];
 	}
-
-	
-
-    // Costs ~85000 gas, 2x ecmul, + mulmod, addmod, hash etc. overheads
-	function CreateProof( uint256 secret, uint256 message )
-	    public payable
-	    returns (uint256[2] memory out_pubkey, uint256 out_s, uint256 out_e)
-	{
-		G1Point memory xG = g1mul(P1(), secret % N());
-		out_pubkey[0] = xG.X;
-		out_pubkey[1] = xG.Y;
-		uint256 k = uint256(keccak256(abi.encodePacked(message, secret))) % N();
-		G1Point memory kG = g1mul(P1(), k);
-		out_e = uint256(keccak256(abi.encodePacked(out_pubkey[0], out_pubkey[1], kG.X, kG.Y, message)));
-		out_s = submod(k, mulmod(secret, out_e, N()));
-	}
-
-	// Costs ~85000 gas, 2x ecmul, 1x ecadd, + small overheads
-	function CalcProof( uint256[2] memory pubkey, uint256 message, uint256 s, uint256 e )
-	    public payable
-	    returns (uint256)
-	{
-	    G1Point memory sG = g1mul(P1(), s % N());
-	    G1Point memory xG = G1Point(pubkey[0], pubkey[1]);
-	    G1Point memory kG = g1add(sG, g1mul(xG, e));
-	    return uint256(keccak256(abi.encodePacked(pubkey[0], pubkey[1], kG.X, kG.Y, message)));
-	}
 	
 	function HashToG1(string memory str) public payable returns (G1Point memory){
 		
 		return g1mul(P1(), uint256(keccak256(abi.encodePacked(str))));
-	}
-
-	function checkKey0( uint256[2] memory PKArr, uint256[2] memory EK0Arr, 
-		uint256[2] memory EK0pArr, 
- 	 	uint256[4] memory tmp, string memory gid, string memory attr)
-	    public payable
-	    returns (bool)
-	{
-		G1Point memory PK=G1Point(PKArr[0], PKArr[1]);
-		G1Point memory EK0=G1Point(EK0Arr[0], EK0Arr[1]);
-		
-		G1Point memory EK0p=G1Point(EK0pArr[0], EK0pArr[1]);
-		
-		G1Point memory A1 = g1mul(PK, tmp[1]);
-		G1Point memory A2 = g1mul(HashToG1(gid), tmp[2]);
-		G1Point memory A3 = g1mul(HashToG1(attr), tmp[3]);
-
-		G1Point memory V0=g1add(g1add(A1,A2),A3);
-		
-		G1Point memory V0p = g1add(EK0p, g1mul(EK0, tmp[0]));
-		require(equals(V0, V0p));
-		
-	   
-	    return true;
 	}
 
 	function negate(G1Point memory p) public payable returns (G1Point memory) {
@@ -330,58 +271,45 @@ contract Basics
     }
 
 
-	function checkKey1(uint256[2][2] memory EK1Arr, uint256[2][2] memory EK1pArr, uint256[2] memory EK2Arr,  uint256[2] memory EK2pArr, uint256[4] memory tmp)
-	    public payable
+    function checkkey()
+    public payable
 	    returns (bool)
 	{
-		G1Point memory EK2=G1Point(EK2Arr[0], EK2Arr[1]);
-		G1Point memory EK2p=G1Point(EK2pArr[0], EK2pArr[1]);
-		G1Point memory V1=g1mul(P1(), tmp[3]);
-		G2Point memory EK1=G2Point(EK1Arr[0], EK1Arr[1]);
-		require(equals(V1, g1add(EK2p,g1mul(EK2,tmp[0]))));
-		require(pairingProd2(negate(EK2), P2(), P1(), EK1));
+        G1Point memory uPK=G1Point(myPKData.uPKArr[0], myPKData.uPKArr[1]);
+		G1Point memory EK0=G1Point(checkkeyProof.EK0Arr[0], checkkeyProof.EK0Arr[1]);
+		G1Point memory EK0p=G1Point(checkkeyProof.EK0pArr[0], checkkeyProof.EK0pArr[1]);
+
+        G1Point memory A1 = g1mul(uPK, checkkeyProof.tmp[1]);
+		G1Point memory A2 = g1mul(HashToG1(checkkeyProof.gid), checkkeyProof.tmp[2]);
+		G1Point memory A3 = g1mul(HashToG1(checkkeyProof.attr), checkkeyProof.tmp[3]);
+		//G1Point memory V0=g1add(g1add(A1,A2),A3);
+        require(equals(g1add(EK0p,g1mul(EK0,checkkeyProof.tmp[0])), g1add(g1add(A1,A2),A3)));  //eq1
 		// V1=multiply(G1, tmp[3])
-	 //   assert(V1==add(EK2p, multiply(EK2, tmp[0])))   
-	 //   assert(pairing(G2,EK2)==pairing(EK1,G1))
-	
+	 	//   assert(V1==add(EK2p, multiply(EK2, tmp[0])))   
+	 	//   assert(pairing(G2,EK2)==pairing(EK1,G1))
+
+        G1Point memory EK2=G1Point(checkkeyProof.EK2Arr[0], checkkeyProof.EK2Arr[1]);
+        G1Point memory EK2p=G1Point(checkkeyProof.EK2pArr[0], checkkeyProof.EK2pArr[1]);
+        require(equals(g1mul(P1(),checkkeyProof.tmp[3]), g1add(EK2p,g1mul(EK2, checkkeyProof.tmp[0]))));  //eq2
+
+		G2Point memory EK1=G2Point(checkkeyProof.EK1Arr[0], checkkeyProof.EK1Arr[1]);
+		require(pairingProd2(negate(EK2), P2(), P1(), EK1));  //eq3
+
+		G2Point memory APK1=G2Point(myPKData.APKArr1[0], myPKData.APKArr1[1]);
+		G2Point memory APK2=G2Point(myPKData.APKArr2[0], myPKData.APKArr2[1]);
+		
+		G1Point memory HGID=HashToG1(checkkeyProof.gid);
+		G1Point memory HATTR=HashToG1(checkkeyProof.attr);
+		G1Point memory NEG=negate(EK0);
+		//G1Point memory NEG=EK0;
+		//G1Point memory nuPK=negate(uPK);
+
+		require(pairingProd4(uPK,APK1,HGID,APK2,HATTR,EK1,NEG, P2()));  //eq4
 	    return true;
 	}
 
-
 	bytes[] opstack;
 	bytes[] valstack;
-
-    // function push(bytes memory data) public {
-    //     stack.push(data);
-    // }
-
-    // function pop() public returns (bytes memory data) {
-    //     data = stack[stack.length - 1];
-    //     // stack.length -= 1;
-    //     delete stack[stack.length -1];
-    // }
-
-
-	// function testNode()
-	//     public payable
-	//     returns (string memory)
-	// {
-	// 	string memory acp="A or ( B and C )";
-
-	// 	strings.slice memory s = acp.toSlice();                
- //        strings.slice memory delim = " ".toSlice();                            
- //        string[] memory parts = new string[](s.count(delim)+1);                  
- //        for (uint i = 0; i < parts.length; i++) {                              
- //           parts[i] = s.split(delim).toString();                               
- //        }                         
-
- //        // return parts[parts.length-1];
- //        for (uint i = 0; i < parts.length; i++) {                              
- //        	string memory token = parts[i];
- //        	if(bytes(token)=="")
- //        }
-		
-	// }
 
 	string private STR = "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd470x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47";
 
@@ -390,7 +318,6 @@ contract Basics
         public payable returns (string memory){
         	return STR;
         }
-
 
     mapping (string => uint256) public expects;
     mapping (address => mapping(string => uint256)) public pool;
@@ -435,10 +362,6 @@ contract Basics
 		
 	    return true;
 	}
-
-
-
-//contract AC {
 
 	bytes1 private constant WHITE_SPACE    = bytes1(" ");
 	bytes1 private constant LEFT_BRACKETS  = bytes1("(");
@@ -573,6 +496,4 @@ contract Basics
 	}
 
 	function empty() public view {}
-//}
-
 }
