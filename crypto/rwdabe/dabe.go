@@ -4,16 +4,16 @@ import (
 	//"basics/crypto/bn128"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
 	bn128 "github.com/fentec-project/bn256"
 	lib "github.com/fentec-project/gofe/abe"
 	"github.com/fentec-project/gofe/data"
 	"github.com/fentec-project/gofe/sample"
 	"golang.org/x/crypto/pbkdf2"
-	"math/big"
-	"strings"
-	"time"
 )
 
 func RandomInt() *big.Int {
@@ -52,13 +52,23 @@ func KDF(gt *bn128.GT) []byte {
 	hash := sha256.New()
 	hash.Write([]byte(gt.String()))
 	hashBytes := hash.Sum(nil)
-	hashString := hex.EncodeToString(hashBytes)
+	//hashString := hex.EncodeToString(hashBytes)
 	password := hashBytes[0:16]
 	salt := hashBytes[16:]
-	fmt.Println(hashString, hex.EncodeToString(password), hex.EncodeToString(salt))
+	//fmt.Println(hashString, hex.EncodeToString(password), hex.EncodeToString(salt))
 	key := pbkdf2.Key(password, salt, 10000, 512, sha256.New)
 	return key
 }
+
+func MakeIntArry(proof *Proof) [4]*big.Int {
+	var intArray [4]*big.Int
+	intArray[0] = new(big.Int).Set(proof.c)
+	intArray[1] = new(big.Int).Set(proof.w1)
+	intArray[2] = new(big.Int).Set(proof.w2)
+	intArray[3] = new(big.Int).Set(proof.w3)
+	return intArray
+}
+
 func xorEncryptDecrypt(data, key []byte) []byte {
 	result := make([]byte, len(data))
 	for i := range data {
@@ -156,7 +166,7 @@ func (a *MAABE) ABEEncrypt(msg string, msp *lib.MSP, pks []*MAABEPubKey) (*MAABE
 	// MA-ABE
 	// generate secret key
 	_, symKey, err := bn128.RandomGT(rand.Reader)
-	fmt.Println(symKey)
+	//fmt.Println(symKey)
 	if err != nil {
 		return nil, err
 	}
@@ -275,6 +285,7 @@ type MAABEKey struct {
 	Attrib   string
 	Key      *bn128.G1
 	KeyPrime *bn128.G2
+	EK2      *bn128.G1
 	D        *big.Int
 }
 
@@ -283,6 +294,7 @@ type Proof struct {
 	G2ToAlpha *bn128.G2
 	Key       *bn128.G1
 	KeyPrime  *bn128.G2
+	EK2P      *bn128.G1
 	c         *big.Int
 	w1        *big.Int
 	w2        *big.Int
@@ -301,6 +313,7 @@ func (a *MAABEKey) String() string {
 func (auth *MAABEAuth) KeyGenPrimeAndGenProofs(enckey *MAABEKey, pku *bn128.G1) (*Proof, error) {
 	alphap, betap, dp := RandomInt(), RandomInt(), RandomInt()
 	key2, _ := auth.ABEKeyGen(enckey.Gid, enckey.Attrib, pku, alphap, betap, dp)
+	ek2p := new(bn128.G1).ScalarMult(auth.Maabe.G1, dp)
 	c := Hash(enckey.String() + key2.String())
 	w1 := new(big.Int).Add(alphap, new(big.Int).Mul(c, auth.Sk.Alpha))
 	w2 := new(big.Int).Add(betap, new(big.Int).Mul(c, auth.Sk.Beta))
@@ -311,14 +324,16 @@ func (auth *MAABEAuth) KeyGenPrimeAndGenProofs(enckey *MAABEKey, pku *bn128.G1) 
 		G2ToAlpha: auth.Pk.G2ToAlpha,
 		Key:       key2.Key,
 		KeyPrime:  key2.KeyPrime,
+		EK2P:      ek2p,
 		c:         c,
 		w1:        w1,
 		w2:        w2,
 		w3:        w3,
 	}, nil
 }
+
 func (auth *MAABEAuth) GetKey(enckey *MAABEKey, userSk *big.Int) *MAABEKey {
-	fmt.Println("GetKey", new(bn128.G1).Add(enckey.Key, new(bn128.G1).Neg(new(bn128.G1).ScalarMult(auth.Pk.GToAlpha, new(big.Int).Sub(userSk, big.NewInt(1))))))
+	//fmt.Println("GetKey", new(bn128.G1).Add(enckey.Key, new(bn128.G1).Neg(new(bn128.G1).ScalarMult(auth.Pk.GToAlpha, new(big.Int).Sub(userSk, big.NewInt(1))))))
 	return &MAABEKey{
 		Gid:      enckey.Gid,
 		Attrib:   enckey.Attrib,
@@ -385,6 +400,7 @@ func (auth *MAABEAuth) ABEKeyGen(gid string, at string, params ...interface{}) (
 	//for i, at := range attribs {
 	var k *bn128.G1
 	var kp *bn128.G2
+	var ek2 *bn128.G1
 	if strings.Split(at, ":")[0] != auth.Pk.ID {
 		return nil, fmt.Errorf("the attribute does not belong to the authority")
 	}
@@ -392,11 +408,13 @@ func (auth *MAABEAuth) ABEKeyGen(gid string, at string, params ...interface{}) (
 	k = new(bn128.G1).Add(new(bn128.G1).ScalarMult(pt, alpha), new(bn128.G1).ScalarMult(hash, beta))
 	k = new(bn128.G1).Add(k, new(bn128.G1).ScalarMult(F_delta, d))
 	kp = new(bn128.G2).ScalarMult(auth.Maabe.G2, d)
+	ek2 = new(bn128.G1).ScalarMult(auth.Maabe.G1, d)
 	ks = &MAABEKey{
 		Gid:      gid,
 		Attrib:   at,
 		Key:      k,
 		KeyPrime: kp,
+		EK2:      ek2,
 		D:        d,
 	}
 	return ks, nil

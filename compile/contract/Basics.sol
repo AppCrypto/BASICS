@@ -271,8 +271,8 @@ contract Basics
     }
 
 
-    function checkkey()
-    public payable
+    function Checkkey()
+    public 
 	    returns (bool)
 	{
         G1Point memory uPK=G1Point(myPKData.uPKArr[0], myPKData.uPKArr[1]);
@@ -305,6 +305,7 @@ contract Basics
 		//G1Point memory nuPK=negate(uPK);
 
 		require(pairingProd4(uPK,APK1,HGID,APK2,HATTR,EK1,NEG, P2()));  //eq4
+		
 	    return true;
 	}
 
