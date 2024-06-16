@@ -67,8 +67,8 @@ func Transact(client *ethclient.Client, privatekey string, value *big.Int) *bind
 	auth, _ := bind.NewKeyedTransactorWithChainID(key, chainID)
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = value
-	auth.GasLimit = uint64(900719925)     //gasLimit
-	auth.GasPrice = big.NewInt(200000000) //gasPrice
+	auth.GasLimit = uint64(900719925)       //gasLimit
+	auth.GasPrice = big.NewInt(20000000000) //gasPrice
 	return auth
 }
 

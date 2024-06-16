@@ -1,4 +1,4 @@
-# Proof of concept implementation for "Practical blockchain-driven data sharing framework for the metaverse based on decentralized CP-ABE"
+# Proof of concept implementation for "Data sharing in the metaverse with key abuse resistance based on decentralized CP-ABE"
 
 # Pre-requisites
 
