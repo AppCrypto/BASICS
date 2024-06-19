@@ -4,8 +4,6 @@ import (
 	"basics/compile/contract"
 	"basics/utils"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -14,8 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	bn128 "github.com/fentec-project/bn256"
-	"golang.org/x/crypto/sha3"
 )
 
 // data, err := json.Marshal(acjudges)
@@ -57,55 +53,6 @@ type ACJudge struct {
 	ACS   string   `json:"acs"`
 }
 
-func randomInt(curveOrder *big.Int) *big.Int {
-	// Generate a random number in [0, curve_order-1]
-	n, err := rand.Int(rand.Reader, curveOrder)
-	if err != nil {
-		panic(err)
-	}
-	// Add 1 to shift to [1, curve_order]
-	n.Add(n, big.NewInt(1))
-	return n
-}
-
-// keccak256 computes the Keccak256 hash of the input data.
-func keccak256(data []byte) []byte {
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(data)
-	return hash.Sum(nil)
-}
-
-// hash2G1 hashes the input data to a point on the bn256 G1 curve.
-func hash2G1(data []byte) *bn128.G1 {
-	hash := keccak256(data)
-	intHash := new(big.Int).SetBytes(hash)
-	g1 := new(bn128.G1)
-	g1.ScalarBaseMult(intHash)
-	return g1
-}
-
-// hash2int converts the Keccak256 hash of the input data to an integer.
-func hash2int(data []byte) *big.Int {
-	hash := keccak256(data)
-	intHash := new(big.Int).SetBytes(hash)
-	return intHash
-}
-
-func testHash2G1() {
-	data := []byte("data")
-
-	// Compute Keccak256 hash
-	hash := keccak256(data)
-	fmt.Println("Keccak256 hash:", hex.EncodeToString(hash))
-
-	// Convert hash to an integer
-	intHash := new(big.Int).SetBytes(hash)
-	fmt.Println("Keccak256 hash as int:", intHash)
-
-	// Hash to G1
-	g1Point := hash2G1(data)
-	fmt.Println("G1 Point:", g1Point)
-}
 func generateACPStr(n int) *ACJudge {
 
 	attrs := make([]string, n)
@@ -131,10 +78,7 @@ func main() {
 	acjudges[7] = generateACPStr(80)
 	acjudges[8] = generateACPStr(90)
 	acjudges[9] = generateACPStr(100)
-	//acjudges[1] = generateACPStr(5)
-	//fmt.Println(acjudges[0])
-	fmt.Println(acjudges[6])
-	fmt.Println("TEST")
+	fmt.Println("judgeAttrsTEST")
 
 	contract_name := "Basics"
 
@@ -151,7 +95,7 @@ func main() {
 
 	ctc, err := contract.NewContract(common.HexToAddress(address.Hex()), client)
 
-	for _, acjudge := range acjudges {
+	for i, acjudge := range acjudges {
 		auth2 := utils.Transact(client, privatekey1, big.NewInt(0))
 		tx1, _ := ctc.Validate(auth2, acjudge.Props, acjudge.ACS)
 		receipt1, err := bind.WaitMined(context.Background(), client, tx1)
@@ -160,9 +104,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Tx receipt failed: %v", err)
 		}
-		fmt.Printf("acjudge%s Gas used: %d\n", acjudge, receipt1.GasUsed)
-		//fmt.Printf("acjudge Gas used: %d\n", receipt1.GasUsed)
-		//fmt.Println(receipt1.GasUsed)
+		fmt.Printf("acjudges[%d] Gas used: %d\n", i, receipt1.GasUsed)
 	}
 
 }
