@@ -9,7 +9,7 @@ import (
 	lib "github.com/fentec-project/gofe/abe"
 )
 
-func offchaintest() {
+func main() {
 
 	maabe := rwdabe.NewMAABE()
 	const times int64 = 100

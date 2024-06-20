@@ -388,7 +388,9 @@ contract Basics
 			propsExist[keccak256(abi.encodePacked(props[i]))] = false;
 		}
 	}
-
+	function concat(bytes memory a, bytes1 b) internal pure returns (bytes memory) {
+        return abi.encodePacked(a, b);
+    }
 	// 保存已有的属性
 	mapping (bytes32 => bool) propsExist;
 	// 暂存操作符 AND、OR、(、)
@@ -410,7 +412,7 @@ contract Basics
 
 			// 如果是字母，收集到 word 里
 			if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) {
-				word = bytes.concat(word, c);
+				word = concat(word, c);
 			}
 
 				// 如果是空格或者括号，就取出 word

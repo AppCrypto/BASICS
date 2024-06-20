@@ -10,7 +10,7 @@ import (
 	lib "github.com/fentec-project/gofe/abe"
 )
 
-func cpabetest() {
+func main() {
 
 	maabe := rwdabe.NewMAABE()
 

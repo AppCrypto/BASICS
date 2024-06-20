@@ -19,7 +19,7 @@ import (
 	//"github.com/fentec-project/gofe/abe"
 )
 
-func incentivetest() {
+func main() {
 	contract_name := "Basics"
 
 	client, err := ethclient.Dial("http://127.0.0.1:8545")
@@ -58,11 +58,12 @@ func incentivetest() {
 	user_Address := common.HexToAddress(utils.GetENV("ACCOUNT_3"))
 
 	var AddressArr []common.Address
-	const n int = 5 //number of accounts
+	const n int = 100 //number of accounts
 	for i := 2; i < n+2; i++ {
-		account := "ACCOUNT_" + strconv.Itoa(i)
+		account := "ACCOUNT_" + strconv.Itoa(i%10)
 		AddressArr = append(AddressArr, common.HexToAddress(utils.GetENV(account)))
 	}
+	fmt.Printf("AddressArr%v\n", AddressArr)
 	//fmt.Println(AddressArr)
 	auth4 := utils.Transact(client, privatekey1, big.NewInt(0))
 	tx4, _ := ctc.Reward(auth4, owner_Address, user_Address, AddressArr, "gid")
