@@ -29,67 +29,6 @@ contract Basics
 		uint[2] Y;
 	}
 
-    struct pk_data
-	{
-		uint256[2]  uPKArr;
-		uint256[2][2] APKArr1;
-		uint256[2][2] APKArr2;
-	}
-
-    struct checkkey_Proof
-    {
-        uint256[2]  EK0Arr; 
-        uint256[2][2]  EK1Arr; 
-        uint256[2]  EK2Arr;
-        uint256[2]  EK0pArr; 
-        uint256[2][2] EK1pArr; 
-        uint256[2]  EK2pArr; 
-        uint256[4]  tmp; 
-        string  gid; 
-        string  attr;
-    }
-
-    pk_data private myPKData;
-
-    checkkey_Proof public checkkeyProof;
-
-    function PKtoSC(
-		uint256[2]  memory _uPKArr,
-		uint256[2][2] memory _APKArr1,
-		uint256[2][2] memory _APKArr2
-	) public {
-		myPKData = pk_data({
-			uPKArr: _uPKArr,
-			APKArr1: _APKArr1,
-			APKArr2: _APKArr2
-		});
-	}
-
-    function ProoftoSC(
-        uint256[2]  memory _EK0Arr, 
-        uint256[2][2]  memory _EK1Arr, 
-        uint256[2]  memory _EK2Arr,
-        uint256[2]  memory _EK0pArr, 
-        uint256[2][2] memory _EK1pArr, 
-        uint256[2]  memory _EK2pArr, 
-        uint256[4]  memory _tmp, 
-        string  memory _gid, 
-        string  memory _attr
-    ) public { // instantiate struct and assign value
-        checkkeyProof = checkkey_Proof({
-            EK0Arr: _EK0Arr,
-            EK1Arr: _EK1Arr,
-            EK2Arr: _EK2Arr,
-            EK0pArr: _EK0pArr,
-            EK1pArr: _EK1pArr,
-            EK2pArr: _EK2pArr,
-            tmp: _tmp,
-            gid: _gid,
-            attr: _attr
-        });
-    }
-
-
 	// (P+1) / 4
 	function A() pure internal returns (uint256) {
 		return CURVE_A;
@@ -270,42 +209,36 @@ contract Basics
         return G1Point(p.X, q - (p.Y % q));
     }
 
+	bool public checkResult; 
 
-    function Checkkey()
+	function QueryResult() public view returns (bool) {
+        return checkResult;
+    }
+
+    function Checkkey(
+		//G1Point memory uPK,
+		//G1Point memory EK0, 
+		//G1Point memory EK0p, 
+		//G2Point memory EK1,
+		//G1Point memory EK2,
+		//G1Point memory EK2p,
+		//G2Point memory APK1,
+		//G2Point memory APK2,
+		G1Point[] memory p1,
+		G2Point[] memory p2, 
+		uint256[4]  memory tmp,
+        string  memory gid, 
+        string  memory attr)
     public 
 	    returns (bool)
 	{
-        G1Point memory uPK=G1Point(myPKData.uPKArr[0], myPKData.uPKArr[1]);
-		G1Point memory EK0=G1Point(checkkeyProof.EK0Arr[0], checkkeyProof.EK0Arr[1]);
-		G1Point memory EK0p=G1Point(checkkeyProof.EK0pArr[0], checkkeyProof.EK0pArr[1]);
-
-        G1Point memory A1 = g1mul(uPK, checkkeyProof.tmp[1]);
-		G1Point memory A2 = g1mul(HashToG1(checkkeyProof.gid), checkkeyProof.tmp[2]);
-		G1Point memory A3 = g1mul(HashToG1(checkkeyProof.attr), checkkeyProof.tmp[3]);
-		//G1Point memory V0=g1add(g1add(A1,A2),A3);
-        require(equals(g1add(EK0p,g1mul(EK0,checkkeyProof.tmp[0])), g1add(g1add(A1,A2),A3)));  //eq1
-		// V1=multiply(G1, tmp[3])
-	 	//   assert(V1==add(EK2p, multiply(EK2, tmp[0])))   
-	 	//   assert(pairing(G2,EK2)==pairing(EK1,G1))
-
-        G1Point memory EK2=G1Point(checkkeyProof.EK2Arr[0], checkkeyProof.EK2Arr[1]);
-        G1Point memory EK2p=G1Point(checkkeyProof.EK2pArr[0], checkkeyProof.EK2pArr[1]);
-        require(equals(g1mul(P1(),checkkeyProof.tmp[3]), g1add(EK2p,g1mul(EK2, checkkeyProof.tmp[0]))));  //eq2
-
-		G2Point memory EK1=G2Point(checkkeyProof.EK1Arr[0], checkkeyProof.EK1Arr[1]);
-		require(pairingProd2(negate(EK2), P2(), P1(), EK1));  //eq3
-
-		G2Point memory APK1=G2Point(myPKData.APKArr1[0], myPKData.APKArr1[1]);
-		G2Point memory APK2=G2Point(myPKData.APKArr2[0], myPKData.APKArr2[1]);
+        require(equals(g1add(p1[2],g1mul(p1[1],tmp[0])), 
+			g1add(g1add(g1mul(p1[0], tmp[1]),g1mul(HashToG1(gid), tmp[2])),g1mul(HashToG1(attr), tmp[3]))));  //eq1
+        require(equals(g1mul(P1(),tmp[3]), g1add(p1[4],g1mul(p1[3],tmp[0]))));  //eq2
+		require(pairingProd2(negate(p1[3]), P2(), P1(), p2[0]));  //eq3
+		require(pairingProd4(p1[0],p2[1],HashToG1(gid),p2[2],HashToG1(attr),p2[0],negate(p1[1]), P2()));  //eq4
 		
-		G1Point memory HGID=HashToG1(checkkeyProof.gid);
-		G1Point memory HATTR=HashToG1(checkkeyProof.attr);
-		G1Point memory NEG=negate(EK0);
-		//G1Point memory NEG=EK0;
-		//G1Point memory nuPK=negate(uPK);
-
-		require(pairingProd4(uPK,APK1,HGID,APK2,HATTR,EK1,NEG, P2()));  //eq4
-		
+		checkResult = true; // 对布尔变量进行赋值
 	    return true;
 	}
 
