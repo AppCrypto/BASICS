@@ -60,8 +60,8 @@ func KDF(gt *bn128.GT) []byte {
 	return key
 }
 
-func MakeIntArry(proof *Proof) [4]*big.Int {
-	var intArray [4]*big.Int
+func MakeIntArry(proof *Proof) []*big.Int {
+	var intArray []*big.Int = make([]*big.Int, 4)
 	intArray[0] = new(big.Int).Set(proof.c)
 	intArray[1] = new(big.Int).Set(proof.w1)
 	intArray[2] = new(big.Int).Set(proof.w2)
