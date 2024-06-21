@@ -34,8 +34,6 @@ contract Basics
 		return CURVE_A;
 	}
 
-	
-
 	function N() pure internal returns (uint256) {
 		return GEN_ORDER;
 	}
@@ -44,20 +42,6 @@ contract Basics
 	function P1() pure internal returns (G1Point memory) {
 		return G1Point(1, 2);
 	}
-
-    // // a - b = c;
-    // function submod(uint a, uint b) internal pure returns (uint){
-    //     uint a_nn;
-
-    //     if(a>b) {
-    //         a_nn = a;
-    //     } else {
-    //         a_nn = a+GEN_ORDER;
-    //     }
-
-    //     return addmod(a_nn - b, 0, GEN_ORDER);
-    // }
-
 
     function expMod(uint256 _base, uint256 _exponent, uint256 _modulus)
         internal view returns (uint256 retval)
@@ -151,255 +135,37 @@ contract Basics
 		require(success);
 		return out[0] != 0;
 	}
+
+	/// Convenience method for a pairing check for two pairs.
+	function pairingProd2(G1Point memory a1, G2Point memory a2, G1Point memory b1, G2Point memory b2) view internal returns (bool) {
+		G1Point[] memory p1 = new G1Point[](2);
+		G2Point[] memory p2 = new G2Point[](2);
+		p1[0] = a1;
+		p1[1] = b1;
+		p2[0] = a2;
+		p2[1] = b2;
+		return pairing(p1, p2);
+	}
+
+	function pairingProd4(
+			G1Point memory a1, G2Point memory a2,
+			G1Point memory b1, G2Point memory b2,
+			G1Point memory c1, G2Point memory c2,
+			G1Point memory d1, G2Point memory d2
+	) view internal returns (bool) {
+		G1Point[] memory p1 = new G1Point[](4);
+		G2Point[] memory p2 = new G2Point[](4);
+		p1[0] = a1;
+		p1[1] = b1;
+		p1[2] = c1;
+		p1[3] = d1;
+		p2[0] = a2;
+		p2[1] = b2;
+		p2[2] = c2;
+		p2[3] = d2;
+		return pairing(p1, p2);
+	}
 	
-
-	
-
-	function equals(
-			G1Point memory a, G1Point memory b			
-	) view internal returns (bool) {		
-		return a.X==b.X && a.Y==b.Y;
-	}
-
-	function equals2(
-			G2Point memory a, G2Point memory b			
-	) view internal returns (bool) {		
-		return a.X[0]==b.X[0] && a.X[1]==b.X[1] && a.Y[0]==b.Y[0] && a.Y[1]==b.Y[1];
-	}
-	
-	function HashToG1(string memory str) public payable returns (G1Point memory){
-		
-		return g1mul(P1(), uint256(keccak256(abi.encodePacked(str))));
-	}
-
-	function negate(G1Point memory p) public payable returns (G1Point memory) {
-        // The prime q in the base field F_q for G1
-        uint q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        if (p.X == 0 && p.Y == 0)
-            return G1Point(0, 0);
-        return G1Point(p.X, q - (p.Y % q));
-    }
-
-	bool public checkResult; 
-
-	function QueryResult() public view returns (bool) {
-        return checkResult;
-    }
-
-    function Checkkey(
-		G1Point[][] memory p1,
-		G2Point[][] memory p2, 
-		uint256[][] memory tmp,
-        string  memory gid, 
-        string[]  memory attr)
-    public 
-	    returns (bool)
-	{
-		for (uint256 i=0;i<p1.length;i++){				
-	        require(equals(g1add(p1[i][2],g1mul(p1[i][1],tmp[i][0])), 
-				g1add(g1add(g1mul(p1[i][0], tmp[i][1]),g1mul(HashToG1(gid), tmp[i][2])),g1mul(HashToG1(attr[i]), tmp[i][3]))));  //eq1
-	        require(equals(g1mul(P1(),tmp[i][3]), g1add(p1[i][4],g1mul(p1[i][3],tmp[i][0]))));  //eq2
-			require(pairingProd2(negate(p1[i][3]), P2(), P1(), p2[i][0]));  //eq3
-			require(pairingProd4(p1[i][0],p2[i][1],HashToG1(gid),p2[i][2],HashToG1(attr[i]),p2[i][0],negate(p1[i][1]), P2()));  //eq4
-		}
-		checkResult = true; // 对布尔变量进行赋值
-	    return true;
-	}
-
-	
-
-	bytes[] opstack;
-	bytes[] valstack;
-
-
-    mapping (string => uint256) public expects;
-    mapping (address => mapping(string => uint256)) public pool;
-    function Expect(string memory GID, uint256 ownerVal)
-	    public payable
-	    returns (bool)
-	{
-		expects[GID]=ownerVal;
-	    return true;
-	}
-	function Deposit(string memory GID)
-	    public payable
-	    returns (bool)
-	{
-		pool[msg.sender][GID]=msg.value;
-	    return true;
-	}
-
-	function Withdraw(string memory GID)
-	    public payable
-	    returns (bool)
-	{
-		require(pool[msg.sender][GID]>0, "NO deposits in pool");
-		payable(msg.sender).transfer(pool[msg.sender][GID]);
-		pool[msg.sender][GID]=0;
-	    return true;
-	}
-
-	function Reward(address addrU, address addrO, address[] memory addrsAA, string memory GID)
-	    public payable
-	    returns (bool)
-	{
-		address payable addru = payable(addrU);
-		address payable addro = payable(addrO);
-		require(pool[addru][GID]>expects[GID],"NO deposits in pool");
-		addro.transfer(expects[GID]);
-		pool[addru][GID]=pool[addru][GID]-expects[GID];
-		for(uint8 i=0;i<addrsAA.length;i++){
-			address payable addraa = payable(addrsAA[i]);
-			addraa.transfer(pool[addru][GID]/addrsAA.length);	
-		}
-		
-	    return true;
-	}
-
-	bytes1 private constant WHITE_SPACE    = bytes1(" ");
-	bytes1 private constant LEFT_BRACKETS  = bytes1("(");
-	bytes1 private constant RIGHT_BRACKETS = bytes1(")");
-
-	bytes private constant AND = bytes("AND");
-	bytes private constant OR  = bytes("OR");
-
-	/**
-     * @dev 判断访问控制结构真假
-     * @notice
-     * @param props  - 属性
-     * @param acs    - 访问控制结构
-     * @return valid - 是否为真
-     */
-	function validate(
-		string[] memory props,
-		string memory acs
-	) public payable returns (bool valid) {
-		for (uint256 i = 0; i < props.length; i++) {
-			// 记录已有属性
-			propsExist[keccak256(abi.encodePacked(props[i]))] = true;
-		}
-
-		calcByPostFix(bytes(acs));
-		valid = result[0];
-
-		for (uint256 i = 0; i < props.length; i++) {
-			// 记录已有属性
-			propsExist[keccak256(abi.encodePacked(props[i]))] = false;
-		}
-	}
-	function concat(bytes memory a, bytes1 b) internal pure returns (bytes memory) {
-        return abi.encodePacked(a, b);
-    }
-	// 保存已有的属性
-	mapping (bytes32 => bool) propsExist;
-	// 暂存操作符 AND、OR、(、)
-	bytes[] ops;
-	// 存储结果表达式
-	bool[] result;
-
-	function calcByPostFix(bytes memory acs) private {
-
-		// 清空两个数组
-		delete ops;
-		delete result;
-
-		// 存储已扫描的单词
-		bytes memory word;
-
-		for (uint256 i = 0; i < acs.length; i++) {
-			bytes1 c = acs[i];
-
-			// 如果是字母，收集到 word 里
-			if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) {
-				word = concat(word, c);
-			}
-
-				// 如果是空格或者括号，就取出 word
-			else {
-				// 如果 word 是操作符 AND、OR
-				if (bytesEqual(word, AND) || bytesEqual(word, OR)) {
-					// 检查操作符栈顶元素
-					// 如果有操作符，且操作符的栈顶不为左括号
-					if (ops.length > 0 && !bytesEqual(ops[ops.length - 1], "(")) {
-						// 弹出栈顶操作符，执行该操作
-						exec(ops[ops.length - 1]);
-					}
-					// 把新操作符添加到栈顶
-					ops.push(word);
-				}
-
-				else if(!bytesEqual(word, "")) {
-					result.push(propsExist[keccak256(abi.encodePacked(word))] == true);
-				}
-
-				word = "";
-
-				// 左括号
-				if (c == LEFT_BRACKETS) {
-					ops.push(abi.encodePacked(LEFT_BRACKETS));
-				}
-
-				// 右括号
-				if (c == RIGHT_BRACKETS) {
-					// 检查栈顶元素
-					bytes memory top = ops[ops.length - 1];
-					// 如果没有到左括号，就一直执行
-					while (!bytesEqual(top, "(")) {
-						exec(top);
-						top = ops[ops.length - 1];
-					}
-					// 到了左括号跳出循环，把左括号弹出
-					ops.pop();
-				}
-			}
-		}
-
-		while (ops.length > 0) {
-			exec(ops[ops.length - 1]);
-		}
-	}
-
-	function exec(bytes memory op) private {
-		// 操作符从栈顶弹出
-		ops.pop();
-		if(result.length < 2) return;
-
-		// 弹出结果栈的两个元素
-		bool t1 = result[result.length - 1];
-		bool t2 = result[result.length - 2];
-		// 执行操作符，将结果写回栈
-		if (bytesEqual(op, AND))
-			result[result.length - 2] = (t1 && t2);
-		else
-			result[result.length - 2] = (t1 || t2);
-
-		result.pop();
-	}
-
-	function stringEqual(
-		string memory a,
-		string memory b
-	) private pure returns (bool same) {
-		return keccak256(bytes(a)) == keccak256(bytes(b));
-	}
-
-	function bytesEqual(
-		bytes memory a,
-		bytes memory b
-	) private pure returns (bool same) {
-		return keccak256(a) == keccak256(b);
-	}
-
-	function empty() public view {}
-	
-
-	struct pk_data
-	{
-		uint256[2]  uPKArr;
-		uint256[2][2] APKArr1;
-		uint256[2][2] APKArr2;
-	}
- 
 	uint256 internal constant FIELD_MODULUS = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 	uint256 internal constant TWISTBX = 0x2b149d40ceb8aaae81be18991be06ac3b5b4c5e559dbefa33267e6dc24a138e5;
     uint256 internal constant TWISTBY = 0x9713b03af0fed4cd2cafadeed8fdf4a74fa084e52d1852e4a2bd0685c315d2;
@@ -785,164 +551,289 @@ contract Basics
             d = d / 2;
         }
     }
-	
 
-
-    // // a - b = c;
-    // function submod1(uint a, uint b) internal pure returns (uint){
-    //     uint a_nn;
-
-    //     if(a>b) {
-    //         a_nn = a;
-    //     } else {
-    //         a_nn = a+GEN_ORDER;
-    //     }
-
-    //     return addmod(a_nn - b, 0, GEN_ORDER);
-    // }
-
-	
-	/// Convenience method for a pairing check for two pairs.
-	function pairingProd2(G1Point memory a1, G2Point memory a2, G1Point memory b1, G2Point memory b2) view internal returns (bool) {
-		G1Point[] memory p1 = new G1Point[](2);
-		G2Point[] memory p2 = new G2Point[](2);
-		p1[0] = a1;
-		p1[1] = b1;
-		p2[0] = a2;
-		p2[1] = b2;
-		return pairing(p1, p2);
+	function equals(
+			G1Point memory a, G1Point memory b			
+	) view internal returns (bool) {		
+		return a.X==b.X && a.Y==b.Y;
 	}
 
-	function pairingProd4(
-			G1Point memory a1, G2Point memory a2,
-			G1Point memory b1, G2Point memory b2,
-			G1Point memory c1, G2Point memory c2,
-			G1Point memory d1, G2Point memory d2
-	) view internal returns (bool) {
-		G1Point[] memory p1 = new G1Point[](4);
-		G2Point[] memory p2 = new G2Point[](4);
-		p1[0] = a1;
-		p1[1] = b1;
-		p1[2] = c1;
-		p1[3] = d1;
-		p2[0] = a2;
-		p2[1] = b2;
-		p2[2] = c2;
-		p2[3] = d2;
-		return pairing(p1, p2);
+	function equals2(
+			G2Point memory a, G2Point memory b			
+	) view internal returns (bool) {		
+		return a.X[0]==b.X[0] && a.X[1]==b.X[1] && a.Y[0]==b.Y[0] && a.Y[1]==b.Y[1];
+	}
+	
+	function HashToG1(string memory str) public payable returns (G1Point memory){
+		
+		return g1mul(P1(), uint256(keccak256(abi.encodePacked(str))));
 	}
 
-
-    struct checkkey_Proof
-    {
-        uint256[2]  EK0Arr; 
-        uint256[2][2]  EK1Arr; 
-        uint256[2]  EK2Arr;
-        uint256[2]  EK0pArr; 
-        uint256[2][2] EK1pArr; 
-        uint256[2]  EK2pArr; 
-        uint256[4]  tmp; 
-        string  gid; 
-        string  attr;
+	function negate(G1Point memory p) public payable returns (G1Point memory) {
+        // The prime q in the base field F_q for G1
+        uint q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        if (p.X == 0 && p.Y == 0)
+            return G1Point(0, 0);
+        return G1Point(p.X, q - (p.Y % q));
     }
 
-	pk_data private myPKData;
-
-    checkkey_Proof public checkkeyProof;
-
-	function PKtoSC(
-		uint256[2]  memory _uPKArr,
-		uint256[2][2] memory _APKArr1,
-		uint256[2][2] memory _APKArr2
-	) public {
-		myPKData = pk_data({
-			uPKArr: _uPKArr,
-			APKArr1: _APKArr1,
-			APKArr2: _APKArr2
-		});
+    function Checkkeyp(
+		G1Point[][] memory p1,
+		G2Point[][] memory p2, 
+		uint256[][] memory tmp,
+        string  memory gid, 
+        string[]  memory attr)
+    public 
+	    returns (bool)
+	{
+		for (uint256 i=0;i<p1.length;i++){				
+	        require(equals(g1add(p1[i][2],g1mul(p1[i][1],tmp[i][0])), 
+				g1add(g1add(g1mul(p1[i][0], tmp[i][1]),g1mul(HashToG1(gid), tmp[i][2])),g1mul(HashToG1(attr[i]), tmp[i][3]))));  //eq1
+	        require(equals(g1mul(P1(),tmp[i][3]), g1add(p1[i][4],g1mul(p1[i][3],tmp[i][0]))));  //eq2
+			require(pairingProd2(negate(p1[i][3]), P2(), P1(), p2[i][0]));  //eq3
+			require(pairingProd4(p1[i][0],p2[i][2],HashToG1(gid),p2[i][3],HashToG1(attr[i]),p2[i][0],negate(p1[i][2]), P2()));  //eq4
+		}
+	    return true;
 	}
 
-    function ProoftoSC(
-        uint256[2]  memory _EK0Arr, 
-        uint256[2][2]  memory _EK1Arr, 
-        uint256[2]  memory _EK2Arr,
-        uint256[2]  memory _EK0pArr, 
-        uint256[2][2] memory _EK1pArr, 
-        uint256[2]  memory _EK2pArr, 
-        uint256[4]  memory _tmp, 
-        string  memory _gid, 
-        string  memory _attr
-    ) public { // instantiate struct and assign value
-        checkkeyProof = checkkey_Proof({
-            EK0Arr: _EK0Arr,
-            EK1Arr: _EK1Arr,
-            EK2Arr: _EK2Arr,
-            EK0pArr: _EK0pArr,
-            EK1pArr: _EK1pArr,
-            EK2pArr: _EK2pArr,
-            tmp: _tmp,
-            gid: _gid,
-            attr: _attr
-        });
+	bytes[] opstack;
+	bytes[] valstack;
+
+
+    mapping (string => uint256) public expects;
+    mapping (address => mapping(string => uint256)) public pool;
+    function Expect(string memory GID, uint256 ownerVal)
+	    public payable
+	    returns (bool)
+	{
+		expects[GID]=ownerVal;
+	    return true;
+	}
+	function Deposit(string memory GID)
+	    public payable
+	    returns (bool)
+	{
+		pool[msg.sender][GID]=msg.value;
+	    return true;
+	}
+
+	function Withdraw(string memory GID)
+	    public payable
+	    returns (bool)
+	{
+		require(pool[msg.sender][GID]>0, "NO deposits in pool");
+		payable(msg.sender).transfer(pool[msg.sender][GID]);
+		pool[msg.sender][GID]=0;
+	    return true;
+	}
+
+	function Reward(address addrU, address addrO, address[] memory addrsAA, string memory GID)
+	    public payable
+	    returns (bool)
+	{
+		address payable addru = payable(addrU);
+		address payable addro = payable(addrO);
+		require(pool[addru][GID]>expects[GID],"NO deposits in pool");
+		addro.transfer(expects[GID]);
+		pool[addru][GID]=pool[addru][GID]-expects[GID];
+		for(uint8 i=0;i<addrsAA.length;i++){
+			address payable addraa = payable(addrsAA[i]);
+			addraa.transfer(pool[addru][GID]/addrsAA.length);	
+		}
+		
+	    return true;
+	}
+
+	bytes1 private constant WHITE_SPACE    = bytes1(" ");
+	bytes1 private constant LEFT_BRACKETS  = bytes1("(");
+	bytes1 private constant RIGHT_BRACKETS = bytes1(")");
+
+	bytes private constant AND = bytes("AND");
+	bytes private constant OR  = bytes("OR");
+
+	/**
+     * @dev 判断访问控制结构真假
+     * @notice
+     * @param props  - 属性
+     * @param acs    - 访问控制结构
+     * @return valid - 是否为真
+     */
+	function validate(
+		string[] memory props,
+		string memory acs
+	) public payable returns (bool valid) {
+		for (uint256 i = 0; i < props.length; i++) {
+			// 记录已有属性
+			propsExist[keccak256(abi.encodePacked(props[i]))] = true;
+		}
+
+		calcByPostFix(bytes(acs));
+		valid = result[0];
+
+		for (uint256 i = 0; i < props.length; i++) {
+			// 记录已有属性
+			propsExist[keccak256(abi.encodePacked(props[i]))] = false;
+		}
+	}
+	function concat(bytes memory a, bytes1 b) internal pure returns (bytes memory) {
+        return abi.encodePacked(a, b);
     }
+	// 保存已有的属性
+	mapping (bytes32 => bool) propsExist;
+	// 暂存操作符 AND、OR、(、)
+	bytes[] ops;
+	// 存储结果表达式
+	bool[] result;
+
+	function calcByPostFix(bytes memory acs) private {
+
+		// 清空两个数组
+		delete ops;
+		delete result;
+
+		// 存储已扫描的单词
+		bytes memory word;
+
+		for (uint256 i = 0; i < acs.length; i++) {
+			bytes1 c = acs[i];
+
+			// 如果是字母，收集到 word 里
+			if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) {
+				word = concat(word, c);
+			}
+
+				// 如果是空格或者括号，就取出 word
+			else {
+				// 如果 word 是操作符 AND、OR
+				if (bytesEqual(word, AND) || bytesEqual(word, OR)) {
+					// 检查操作符栈顶元素
+					// 如果有操作符，且操作符的栈顶不为左括号
+					if (ops.length > 0 && !bytesEqual(ops[ops.length - 1], "(")) {
+						// 弹出栈顶操作符，执行该操作
+						exec(ops[ops.length - 1]);
+					}
+					// 把新操作符添加到栈顶
+					ops.push(word);
+				}
+
+				else if(!bytesEqual(word, "")) {
+					result.push(propsExist[keccak256(abi.encodePacked(word))] == true);
+				}
+
+				word = "";
+
+				// 左括号
+				if (c == LEFT_BRACKETS) {
+					ops.push(abi.encodePacked(LEFT_BRACKETS));
+				}
+
+				// 右括号
+				if (c == RIGHT_BRACKETS) {
+					// 检查栈顶元素
+					bytes memory top = ops[ops.length - 1];
+					// 如果没有到左括号，就一直执行
+					while (!bytesEqual(top, "(")) {
+						exec(top);
+						top = ops[ops.length - 1];
+					}
+					// 到了左括号跳出循环，把左括号弹出
+					ops.pop();
+				}
+			}
+		}
+
+		while (ops.length > 0) {
+			exec(ops[ops.length - 1]);
+		}
+	}
+
+	function exec(bytes memory op) private {
+		// 操作符从栈顶弹出
+		ops.pop();
+		if(result.length < 2) return;
+
+		// 弹出结果栈的两个元素
+		bool t1 = result[result.length - 1];
+		bool t2 = result[result.length - 2];
+		// 执行操作符，将结果写回栈
+		if (bytesEqual(op, AND))
+			result[result.length - 2] = (t1 && t2);
+		else
+			result[result.length - 2] = (t1 || t2);
+
+		result.pop();
+	}
+
+	function stringEqual(
+		string memory a,
+		string memory b
+	) private pure returns (bool same) {
+		return keccak256(bytes(a)) == keccak256(bytes(b));
+	}
+
+	function bytesEqual(
+		bytes memory a,
+		bytes memory b
+	) private pure returns (bool same) {
+		return keccak256(a) == keccak256(b);
+	}
+
+	function empty() public view {}
+	
+	struct ECTwistPoint {
+    	uint256 xx;
+    	uint256 xy;
+    	uint256 yx;
+    	uint256 yy;
+	}
 
 
 	// G2运算的判断式
-	function checkkey_eq2()  
+	function checkkey_eq2(
+		G2Point memory EK1Arr,
+		G2Point memory EK1pArr,
+		uint256 c,
+		uint256 w3
+	)  
 	public payable
 		returns (bool)
 	{
-		uint256 tmp1xx;
-		uint256 tmp1xy;
-		uint256 tmp1yx;
-		uint256 tmp1yy;
+		ECTwistPoint memory tmp1;
 
-		uint256 tmp2xx;
-		uint256 tmp2xy;
-		uint256 tmp2yx;
-		uint256 tmp2yy;
+		(tmp1.xx,tmp1.xy,tmp1.yx,tmp1.yy)=ECTwistMul(c,EK1Arr.X[1],EK1Arr.X[0],EK1Arr.Y[1],EK1Arr.Y[0]);
 
-		(tmp1xx,tmp1xy,tmp1yx,tmp1yy)=ECTwistMul(checkkeyProof.tmp[0],checkkeyProof.EK1Arr[0][1],checkkeyProof.EK1Arr[0][0],checkkeyProof.EK1Arr[1][1],checkkeyProof.EK1Arr[1][0]);
-		(tmp1xx,tmp1xy,tmp1yx,tmp1yy)=ECTwistAdd(checkkeyProof.EK1pArr[0][1],checkkeyProof.EK1pArr[0][0],checkkeyProof.EK1pArr[1][1],checkkeyProof.EK1pArr[1][0],tmp1xx,tmp1xy,tmp1yx,tmp1yy);
-
-		(tmp2xx,tmp2xy,tmp2yx,tmp2yy)=ECTwistMul(checkkeyProof.tmp[3],
+		ECTwistPoint memory tmp2;
+		(tmp2.xx,tmp2.xy,tmp2.yx,tmp2.yy)=ECTwistAdd(EK1pArr.X[1],EK1pArr.X[0],EK1pArr.Y[1],EK1pArr.Y[0],tmp1.xx,tmp1.xy,tmp1.yx,tmp1.yy);
+		
+		(tmp1.xx,tmp1.xy,tmp1.yx,tmp1.yy)=ECTwistMul(w3,
 			10857046999023057135944570762232829481370756359578518086990519993285655852781,
 			11559732032986387107991004021392285783925812861821192530917403151452391805634,
 			8495653923123431417604973247489272438418190587263600148770280649306958101930,
 			4082367875863433681332203403145435568316851327593401208105741076214120093531);  //G2 generator
 
-		require(tmp1xx==tmp2xx && tmp1xy==tmp2xy && tmp1yx==tmp2yx && tmp1yy==tmp2yy);
+		require(tmp1.xx==tmp2.xx && tmp1.xy==tmp2.xy && tmp1.yx==tmp2.yx && tmp1.yy==tmp2.yy);
 		return (true);
 	}
 
-	function checkkey1()
-	public payable
+	function Checkkey(
+		G1Point[][] memory p1,
+		G2Point[][] memory p2, 
+		uint256[][] memory tmp,
+        string  memory gid, 
+        string[]  memory attr)
+    public 
 	    returns (bool)
 	{
-		G1Point memory uPK=G1Point(myPKData.uPKArr[0], myPKData.uPKArr[1]);
-		G1Point memory EK0=G1Point(checkkeyProof.EK0Arr[0], checkkeyProof.EK0Arr[1]);
-		G1Point memory EK0p=G1Point(checkkeyProof.EK0pArr[0], checkkeyProof.EK0pArr[1]);
-
-        G1Point memory A1 = g1mul(uPK, checkkeyProof.tmp[1]);
-		G1Point memory A2 = g1mul(HashToG1(checkkeyProof.gid), checkkeyProof.tmp[2]);
-		G1Point memory A3 = g1mul(HashToG1(checkkeyProof.attr), checkkeyProof.tmp[3]);
-		//G1Point memory V0=g1add(g1add(A1,A2),A3);
-        require(equals(g1add(EK0p,g1mul(EK0,checkkeyProof.tmp[0])), g1add(g1add(A1,A2),A3)));  //eq1
-
-		//eq2 G2群运算
-		require(checkkey_eq2());//eq2
 		
-		//G2Point memory EK1p=G2Point(checkkeyProof.EK1pArr[0], checkkeyProof.EK1pArr[1]);
+		for (uint256 i=0;i<p1.length;i++){				
+	        require(equals(g1add(p1[i][2],g1mul(p1[i][1],tmp[i][0])), 
+				g1add(g1add(g1mul(p1[i][0], tmp[i][1]),g1mul(HashToG1(gid), tmp[i][2])),g1mul(HashToG1(attr[i]), tmp[i][3]))));  //eq1
 
-		G2Point memory EK1=G2Point(checkkeyProof.EK1Arr[0], checkkeyProof.EK1Arr[1]);
-		G2Point memory APK1=G2Point(myPKData.APKArr1[0], myPKData.APKArr1[1]);
-		G2Point memory APK2=G2Point(myPKData.APKArr2[0], myPKData.APKArr2[1]);
-		
-		G1Point memory HGID=HashToG1(checkkeyProof.gid);
-		G1Point memory HATTR=HashToG1(checkkeyProof.attr);
-		G1Point memory NEG=negate(EK0);
+	        require(checkkey_eq2(p2[i][0],p2[i][1],tmp[i][0],tmp[i][3]));  //eq2
 
-		require(pairingProd4(uPK,APK1,HGID,APK2,HATTR,EK1,NEG, P2()));  //eq3
-		return (true);
+			require(pairingProd4(p1[i][0],p2[i][2],HashToG1(gid),p2[i][3],HashToG1(attr[i]),p2[i][0],negate(p1[i][2]), P2()));  //eq3
+		}
+	    return true;
 	}
+
 }

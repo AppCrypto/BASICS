@@ -168,7 +168,7 @@ func main() {
 	for i := 0; i < num; i++ {
 		intArray := rwdabe.MakeIntArry(Proofs[i])
 		newPoint1 := []contract.BasicsG1Point{G1ToPoint(userPk), G1ToPoint(ksEnc[i].Key), G1ToPoint(Proofs[i].Key), G1ToPoint(ksEnc[i].EK2), G1ToPoint(Proofs[i].EK2P)}
-		newPoint2 := []contract.BasicsG2Point{G2ToPoint(ksEnc[i].KeyPrime), G2ToPoint(Proofs[i].G2ToAlpha), G2ToPoint(Proofs[i].G2ToBeta)}
+		newPoint2 := []contract.BasicsG2Point{G2ToPoint(ksEnc[i].KeyPrime), G2ToPoint(Proofs[i].KeyPrime), G2ToPoint(Proofs[i].G2ToAlpha), G2ToPoint(Proofs[i].G2ToBeta)}
 		//offchain Checkkey
 		_, _ = maabe.CheckKey(userPk, ksEnc[i], Proofs[i])
 		p1Arr = append(p1Arr, newPoint1)
@@ -178,10 +178,16 @@ func main() {
 
 	}
 	//on chain CheckKey
-	autht := utils.Transact(client, privatekey1, big.NewInt(0))
-	tx3, _ := ctc.Checkkey(autht, p1Arr, p2Arr, tmpArr, gid, attrArr) //checkkey on-chain
+	autht1 := utils.Transact(client, privatekey1, big.NewInt(0))
+	tx3, _ := ctc.Checkkeyp(autht1, p1Arr, p2Arr, tmpArr, gid, attrArr) //checkkey on-chain
 	receipt3, _ := bind.WaitMined(context.Background(), client, tx3)
-	fmt.Printf("Checkkey Gas used: %d\n", receipt3.GasUsed)
+	fmt.Printf("Checkkeyp Gas used: %d\n", receipt3.GasUsed)
+
+	//on chain CheckKey
+	autht2 := utils.Transact(client, privatekey1, big.NewInt(0))
+	tx4, _ := ctc.Checkkey(autht2, p1Arr, p2Arr, tmpArr, gid, attrArr) //checkkey on-chain
+	receipt4, _ := bind.WaitMined(context.Background(), client, tx4)
+	fmt.Printf("Checkkey Gas used: %d\n", receipt4.GasUsed)
 
 	//judgeAttrs
 	for _, acjudge := range acjudges {
