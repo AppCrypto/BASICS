@@ -42,7 +42,13 @@ contract Basics
 	function P1() pure internal returns (G1Point memory) {
 		return G1Point(1, 2);
 	}
-
+    G1Point G1 = G1Point(1, 2);
+    G2Point G2 = G2Point(
+        [11559732032986387107991004021392285783925812861821192530917403151452391805634,
+        10857046999023057135944570762232829481370756359578518086990519993285655852781],
+        [4082367875863433681332203403145435568316851327593401208105741076214120093531,
+        8495653923123431417604973247489272438418190587263600148770280649306958101930]
+    );
     function expMod(uint256 _base, uint256 _exponent, uint256 _modulus)
         internal view returns (uint256 retval)
     {
@@ -137,15 +143,15 @@ contract Basics
 	}
 
 	/// Convenience method for a pairing check for two pairs.
-	function pairingProd2(G1Point memory a1, G2Point memory a2, G1Point memory b1, G2Point memory b2) view internal returns (bool) {
-		G1Point[] memory p1 = new G1Point[](2);
-		G2Point[] memory p2 = new G2Point[](2);
-		p1[0] = a1;
-		p1[1] = b1;
-		p2[0] = a2;
-		p2[1] = b2;
-		return pairing(p1, p2);
-	}
+//	function pairingProd2(G1Point memory a1, G2Point memory a2, G1Point memory b1, G2Point memory b2) view internal returns (bool) {
+//		G1Point[] memory p1 = new G1Point[](2);
+//		G2Point[] memory p2 = new G2Point[](2);
+//		p1[0] = a1;
+//		p1[1] = b1;
+//		p2[0] = a2;
+//		p2[1] = b2;
+//		return pairing(p1, p2);
+//	}
 
 	function pairingProd4(
 			G1Point memory a1, G2Point memory a2,
@@ -563,7 +569,7 @@ contract Basics
 	) view internal returns (bool) {		
 		return a.X[0]==b.X[0] && a.X[1]==b.X[1] && a.Y[0]==b.Y[0] && a.Y[1]==b.Y[1];
 	}
-	
+
 	function HashToG1(string memory str) public payable returns (G1Point memory){
 		
 		return g1mul(P1(), uint256(keccak256(abi.encodePacked(str))));
@@ -576,25 +582,6 @@ contract Basics
             return G1Point(0, 0);
         return G1Point(p.X, q - (p.Y % q));
     }
-
-    function Checkkeyp(
-		G1Point[][] memory p1,
-		G2Point[][] memory p2, 
-		uint256[][] memory tmp,
-        string  memory gid, 
-        string[]  memory attr)
-    public 
-	    returns (bool)
-	{
-		for (uint256 i=0;i<p1.length;i++){				
-	        require(equals(g1add(p1[i][2],g1mul(p1[i][1],tmp[i][0])), 
-				g1add(g1add(g1mul(p1[i][0], tmp[i][1]),g1mul(HashToG1(gid), tmp[i][2])),g1mul(HashToG1(attr[i]), tmp[i][3]))));  //eq1
-	        require(equals(g1mul(P1(),tmp[i][3]), g1add(p1[i][4],g1mul(p1[i][3],tmp[i][0]))));  //eq2
-			require(pairingProd2(negate(p1[i][3]), P2(), P1(), p2[i][0]));  //eq3
-			require(pairingProd4(p1[i][0],p2[i][2],HashToG1(gid),p2[i][3],HashToG1(attr[i]),p2[i][0],negate(p1[i][2]), P2()));  //eq4
-		}
-	    return true;
-	}
 
 	bytes[] opstack;
 	bytes[] valstack;
@@ -805,34 +792,74 @@ contract Basics
 		ECTwistPoint memory tmp2;
 		(tmp2.xx,tmp2.xy,tmp2.yx,tmp2.yy)=ECTwistAdd(EK1pArr.X[1],EK1pArr.X[0],EK1pArr.Y[1],EK1pArr.Y[0],tmp1.xx,tmp1.xy,tmp1.yx,tmp1.yy);
 		
-		(tmp1.xx,tmp1.xy,tmp1.yx,tmp1.yy)=ECTwistMul(w3,
-			10857046999023057135944570762232829481370756359578518086990519993285655852781,
-			11559732032986387107991004021392285783925812861821192530917403151452391805634,
-			8495653923123431417604973247489272438418190587263600148770280649306958101930,
-			4082367875863433681332203403145435568316851327593401208105741076214120093531);  //G2 generator
+		(tmp1.xx,tmp1.xy,tmp1.yx,tmp1.yy)=ECTwistMul(w3, G2.X[1], G2.X[0], G2.Y[1], G2.Y[0]);  //G2 generator
 
 		require(tmp1.xx==tmp2.xx && tmp1.xy==tmp2.xy && tmp1.yx==tmp2.yx && tmp1.yy==tmp2.yy);
 		return (true);
 	}
-
+    G1Point Checkkeyresult;
 	function Checkkey(
 		G1Point[][] memory p1,
 		G2Point[][] memory p2, 
 		uint256[][] memory tmp,
         string  memory gid, 
-        string[]  memory attr)
-    public payable returns (bool)
+        string[]  memory attr,
+        G1Point memory pk)
+    public payable returns (G1Point memory Checkkeyresult)
 	{
-		
-		for (uint256 i=0;i<p1.length;i++){				
-	        require(equals(g1add(p1[i][2],g1mul(p1[i][1],tmp[i][0])), 
-				g1add(g1add(g1mul(p1[i][0], tmp[i][1]),g1mul(HashToG1(gid), tmp[i][2])),g1mul(HashToG1(attr[i]), tmp[i][3]))));  //eq1
+        for (uint256 i=0;i<p1.length;i++){
+            require(equals(g1add(p1[i][1],g1mul(p1[i][0],tmp[i][0])),
+                g1add(g1add(g1mul(pk, tmp[i][1]),g1mul(HashToG1(gid), tmp[i][2])), g1mul(HashToG1(attr[i]), tmp[i][3]))),"eq1");  //eq1 TODO not work
+            require(checkkey_eq2(p2[i][0],p2[i][1],tmp[i][0],tmp[i][3]),"eq2");  //eq2
 
-	        require(checkkey_eq2(p2[i][0],p2[i][1],tmp[i][0],tmp[i][3]));  //eq2
-
-			require(pairingProd4(p1[i][0],p2[i][2],HashToG1(gid),p2[i][3],HashToG1(attr[i]),p2[i][0],negate(p1[i][2]), P2()));  //eq3
+ 			 require(pairingProd4(pk,p2[i][2],HashToG1(gid),p2[i][3],HashToG1(attr[i]),p2[i][0],negate(p1[i][1]), P2()),"eq3");  //eq3
 		}
-	    return true;
+	    return Checkkeyresult;
 	}
+
+    function Checkkeyp(
+        G1Point[][] memory p1,
+        G2Point[][] memory p2,
+        uint256[][] memory tmp,
+        string  memory gid,
+        string[]  memory attr,
+        G1Point memory pk)
+    public
+    returns (bool)
+    {
+        G1Point memory hg1;
+        G1Point memory hgid= HashToG1(gid);
+        for (uint256 i=0;i<p1.length;i++){
+            hg1= HashToG1(attr[i]);
+            require(equals(g1add(p1[i][1],g1mul(p1[i][0],tmp[i][0])),
+                g1add(g1add(g1mul(pk, tmp[i][1]),g1mul(hgid, tmp[i][2])), g1mul(hg1, tmp[i][3]))),"eq1");  //eq1 TODO not work
+            require(equals(g1mul(G1,tmp[i][3]), g1add(p1[i][4],g1mul(p1[i][2],tmp[i][0]))));  //eq2
+            G1Point[] memory p1Arr = new G1Point[](2);
+		    G2Point[] memory p2Arr = new G2Point[](2);
+            p1Arr[0] = negate(p1[i][2]);
+            p1Arr[1] = G1;
+            p2Arr[0] = G2;
+            p2Arr[1] = p2[i][0];
+            require(pairing(p1Arr, p2Arr));  //eq3
+//            require(pairingProd2(negate(p1[i][2]), G2, G1, p2[i][0]));  //eq3
+            G1Point[] memory pp1= new G1Point[](4);
+            pp1[0]=pk;
+            pp1[1]=hgid;
+            pp1[2]=hg1;
+            pp1[3]=negate(p1[i][1]);
+            G2Point[] memory pp2= new G2Point[](4);
+            pp2[0]=p2[i][2];
+            pp2[1]=p2[i][3];
+            pp2[2]=p2[i][0];
+            pp2[3]=G2;
+            require(pairing(pp1, pp2));
+//            pairingProd4(pk,p2[i][2],hgid,p2[i][3],hg1,p2[i][0],negate(p1[i][1]), G2));  //eq4
+        }
+        return true;
+    }
+
+    function CheckkeyRes() public view returns (G1Point memory) {
+        return Checkkeyresult;
+    }
 
 }

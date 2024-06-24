@@ -90,7 +90,7 @@ func main() {
 
 	maabe := rwdabe.NewMAABE()
 
-	const num int = 10                //number of auths
+	const num int = 100               //number of auths
 	const times int64 = 5             //test times
 	const CTsize1M = int(1024 * 1024) //the msg  iinit set 1M
 
@@ -165,10 +165,13 @@ func main() {
 
 	for i := 0; i < num; i++ {
 		intArray := rwdabe.MakeIntArry(Proofs[i])
-		newPoint1 := []contract.BasicsG1Point{G1ToPoint(userPk), G1ToPoint(ksEnc[i].Key), G1ToPoint(Proofs[i].Key), G1ToPoint(ksEnc[i].EK2), G1ToPoint(Proofs[i].EK2P)}
+		newPoint1 := []contract.BasicsG1Point{G1ToPoint(ksEnc[i].Key), G1ToPoint(Proofs[i].Key), G1ToPoint(ksEnc[i].EK2), G1ToPoint(Proofs[i].EK2P)}
 		newPoint2 := []contract.BasicsG2Point{G2ToPoint(ksEnc[i].KeyPrime), G2ToPoint(Proofs[i].KeyPrime), G2ToPoint(Proofs[i].G2ToAlpha), G2ToPoint(Proofs[i].G2ToBeta)}
 		//offchain Checkkey
-		_, _ = maabe.CheckKey(userPk, ksEnc[i], Proofs[i])
+		res, _ := maabe.CheckKey(userPk, ksEnc[i], Proofs[i])
+		if !res {
+			fmt.Println("offchain checkey", res)
+		}
 		p1Arr = append(p1Arr, newPoint1)
 		p2Arr = append(p2Arr, newPoint2)
 		tmpArr = append(tmpArr, intArray)
@@ -177,16 +180,18 @@ func main() {
 	}
 	//on chain CheckKey
 	autht1 := utils.Transact(client, privatekey1, big.NewInt(0))
-	// fmt.Println(attrArr)
-	tx3, _ := ctc.Checkkeyp(autht1, p1Arr, p2Arr, tmpArr, gid, attrArr) //checkkey on-chain
+	// fmt.Println(p1Arr)
+	tx3, _ := ctc.Checkkeyp(autht1, p1Arr, p2Arr, tmpArr, gid, attrArr, G1ToPoint(userPk)) //checkkey on-chain
 	receipt3, _ := bind.WaitMined(context.Background(), client, tx3)
 	fmt.Printf("Checkkeyp Gas used: %d\n", receipt3.GasUsed)
 
 	//on chain CheckKey
 	autht2 := utils.Transact(client, privatekey1, big.NewInt(0))
-	tx4, _ := ctc.Checkkey(autht2, p1Arr, p2Arr, tmpArr, gid, attrArr) //checkkey on-chain
+	tx4, _ := ctc.Checkkey(autht2, p1Arr, p2Arr, tmpArr, gid, attrArr, G1ToPoint(userPk)) //checkkey on-chain
 	receipt4, _ := bind.WaitMined(context.Background(), client, tx4)
 	fmt.Printf("Checkkey Gas used: %d\n", receipt4.GasUsed)
+	Checkkeyres, _ := ctc.CheckkeyRes(&bind.CallOpts{})
+	fmt.Printf("Checkkey Checkkeyres used: %d\n", Checkkeyres)
 
 	//judgeAttrs
 	for _, acjudge := range acjudges {

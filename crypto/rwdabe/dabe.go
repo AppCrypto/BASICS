@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"golang.org/x/crypto/sha3"
 	"math/big"
 	"strings"
 	"time"
@@ -251,7 +252,7 @@ func (a *MAABE) ABEEncrypt(msg string, msp *lib.MSP, pks []*MAABEPubKey) (*MAABE
 				c1[at] = new(bn128.GT).Add(tmpLambda, new(bn128.GT).ScalarMult(pk.EggToAlpha, r[at]))
 				c2[at] = new(bn128.G2).ScalarMult(new(bn128.G2).Neg(a.G2), r[at]) //new(bn128.G2).ScalarMult(a.G2, r[at])
 				c3[at] = new(bn128.G2).Add(new(bn128.G2).ScalarMult(pk.G2ToBeta, r[at]), tmpOmega)
-				F_delta, _ := bn128.HashG1(at)
+				F_delta := a.HashG1(at)
 				c4[at] = new(bn128.G1).ScalarMult(F_delta, r[at])
 				foundPK = true
 				break
@@ -316,8 +317,11 @@ func (auth *MAABEAuth) KeyGenPrimeAndGenProofs(enckey *MAABEKey, pku *bn128.G1) 
 	ek2p := new(bn128.G1).ScalarMult(auth.Maabe.G1, dp)
 	c := Hash(enckey.String() + key2.String())
 	w1 := new(big.Int).Add(alphap, new(big.Int).Mul(c, auth.Sk.Alpha))
+	w1.Mod(w1, bn128.Order)
 	w2 := new(big.Int).Add(betap, new(big.Int).Mul(c, auth.Sk.Beta))
+	w2.Mod(w2, bn128.Order)
 	w3 := new(big.Int).Add(dp, new(big.Int).Mul(c, enckey.D))
+	w3.Mod(w3, bn128.Order)
 	//fmt.Println("KeyGenPrimeAndGenProofs", w1, w2, w3, alphap, betap, dp, enckey.D)
 	return &Proof{
 		G2ToBeta:  auth.Pk.G2ToBeta,
@@ -342,18 +346,26 @@ func (auth *MAABEAuth) GetKey(enckey *MAABEKey, userSk *big.Int) *MAABEKey {
 		D:        big.NewInt(0),
 	}
 }
+func (abe *MAABE) HashG1(msg string) *bn128.G1 {
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write([]byte(msg))
+	v := hash.Sum(nil)
+	return new(bn128.G1).ScalarMult(abe.G1, new(big.Int).SetBytes(v))
+
+}
 
 // CheckKey cheks whether the enckey is correct or not
 func (abe *MAABE) CheckKey(pku *bn128.G1, enckey *MAABEKey, proof *Proof) (bool, error) {
 	part1 := new(bn128.G1).ScalarMult(pku, proof.w1)
-	hashGID, _ := bn128.HashG1(enckey.Gid)
+	hashGID := abe.HashG1(enckey.Gid)
 	part2 := new(bn128.G1).ScalarMult(hashGID, proof.w2)
-	F_delta, _ := bn128.HashG1(enckey.Attrib)
+	F_delta := abe.HashG1(enckey.Attrib)
 	part3 := new(bn128.G1).ScalarMult(F_delta, proof.w3)
 	left1 := new(bn128.G1).Add(part1, part2)
-	left1.Add(part3, left1)
-	//fmt.Println("left1", left1.String())
+	left1.Add(left1, part3)
+
 	right1 := new(bn128.G1).Add(proof.Key, new(bn128.G1).ScalarMult(enckey.Key, proof.c))
+	//fmt.Println("left1", left1, right1)
 	//fmt.Println("=======", proof.c, proof.Key, right1, left1)
 	if left1.String() != right1.String() {
 		return false, fmt.Errorf("checkKey first equation fails")
@@ -392,10 +404,10 @@ func (auth *MAABEAuth) ABEKeyGen(gid string, at string, params ...interface{}) (
 	if auth.Maabe == nil {
 		return nil, fmt.Errorf("ma-abe scheme cannot be nil")
 	}
-	hash, err := bn128.HashG1(gid)
-	if err != nil {
-		return nil, err
-	}
+	hash := auth.Maabe.HashG1(gid)
+	//if err != nil {
+	//	return nil, err
+	//}
 	ks := new(MAABEKey)
 	//for i, at := range attribs {
 	var k *bn128.G1
@@ -404,7 +416,7 @@ func (auth *MAABEAuth) ABEKeyGen(gid string, at string, params ...interface{}) (
 	if strings.Split(at, ":")[0] != auth.Pk.ID {
 		return nil, fmt.Errorf("the attribute does not belong to the authority")
 	}
-	F_delta, _ := bn128.HashG1(at)
+	F_delta := auth.Maabe.HashG1(at)
 	k = new(bn128.G1).Add(new(bn128.G1).ScalarMult(pt, alpha), new(bn128.G1).ScalarMult(hash, beta))
 	k = new(bn128.G1).Add(k, new(bn128.G1).ScalarMult(F_delta, d))
 	kp = new(bn128.G2).ScalarMult(auth.Maabe.G2, d)
@@ -437,10 +449,10 @@ func (a *MAABE) ABEDecrypt(ct *MAABECipher, ks []*MAABEKey) (string, error) {
 		}
 	}
 	// get hashed GID
-	hash, err := bn128.HashG1(gid)
-	if err != nil {
-		return "", err
-	}
+	hash := a.HashG1(gid)
+	//if err != nil {
+	//	return "", err
+	//}
 	// find out which attributes are valid and extract them
 	goodMatRows := make([]data.Vector, 0)
 	goodAttribs := make([]string, 0)
