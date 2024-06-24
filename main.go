@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/fentec-project/bn256"
 	bn128 "github.com/fentec-project/bn256"
 	lib "github.com/fentec-project/gofe/abe"
 )
@@ -23,7 +22,7 @@ type ACJudge struct {
 	ACS   string   `json:"acs"`
 }
 
-func G1ToPoint(point *bn256.G1) contract.BasicsG1Point {
+func G1ToPoint(point *bn128.G1) contract.BasicsG1Point {
 	// Marshal the G1 point to get the X and Y coordinates as bytes
 	pointBytes := point.Marshal()
 	//fmt.Println(point.Marshal())
@@ -39,7 +38,7 @@ func G1ToPoint(point *bn256.G1) contract.BasicsG1Point {
 	return g1Point
 }
 
-func G2ToPoint(point *bn256.G2) contract.BasicsG2Point {
+func G2ToPoint(point *bn128.G2) contract.BasicsG2Point {
 	// Marshal the G1 point to get the X and Y coordinates as bytes
 	pointBytes := point.Marshal()
 	//fmt.Println(point.Marshal())
@@ -91,7 +90,7 @@ func main() {
 
 	maabe := rwdabe.NewMAABE()
 
-	const num int = 100               //number of auths
+	const num int = 10                //number of auths
 	const times int64 = 5             //test times
 	const CTsize1M = int(1024 * 1024) //the msg  iinit set 1M
 
@@ -158,12 +157,11 @@ func main() {
 	}
 
 	fmt.Println("...........................................................Verify...........................................................")
-	//CheckKey1  off-chain (3 eq)
-	//CheckKey2 on-chain (4 eq)
-	p1Arr := make([][]contract.BasicsG1Point, num)
-	p2Arr := make([][]contract.BasicsG2Point, num)
-	tmpArr := make([][]*big.Int, num)
-	attrArr := make([]string, num)
+
+	p1Arr := make([][]contract.BasicsG1Point, 0)
+	p2Arr := make([][]contract.BasicsG2Point, 0)
+	tmpArr := make([][]*big.Int, 0)
+	attrArr := make([]string, 0)
 
 	for i := 0; i < num; i++ {
 		intArray := rwdabe.MakeIntArry(Proofs[i])
@@ -179,6 +177,7 @@ func main() {
 	}
 	//on chain CheckKey
 	autht1 := utils.Transact(client, privatekey1, big.NewInt(0))
+	// fmt.Println(attrArr)
 	tx3, _ := ctc.Checkkeyp(autht1, p1Arr, p2Arr, tmpArr, gid, attrArr) //checkkey on-chain
 	receipt3, _ := bind.WaitMined(context.Background(), client, tx3)
 	fmt.Printf("Checkkeyp Gas used: %d\n", receipt3.GasUsed)
@@ -194,7 +193,7 @@ func main() {
 		auth2 := utils.Transact(client, privatekey1, big.NewInt(0))
 		tx1, _ := ctc.Validate(auth2, acjudge.Props, acjudge.ACS)
 		receipt1, _ := bind.WaitMined(context.Background(), client, tx1)
-		fmt.Printf("acjudge%s Gas used: %d\n", acjudge, receipt1.GasUsed)
+		fmt.Printf("attribute number %d, Validate ACP Gas used: %d\n", num, receipt1.GasUsed)
 	}
 
 	fmt.Println("...........................................................Access...........................................................")

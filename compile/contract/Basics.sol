@@ -821,8 +821,7 @@ contract Basics
 		uint256[][] memory tmp,
         string  memory gid, 
         string[]  memory attr)
-    public 
-	    returns (bool)
+    public payable returns (bool)
 	{
 		
 		for (uint256 i=0;i<p1.length;i++){				
