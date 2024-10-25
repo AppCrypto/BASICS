@@ -1,3 +1,4 @@
+cd $GITDIR/BASICS/compile/
 rm -rf ./contract/*.bin
 rm -rf ./contract/*.abi
 rm -rf ./contract/*.go

@@ -355,11 +355,21 @@ func (abe *MAABE) HashG1(msg string) *bn128.G1 {
 }
 
 // CheckKey cheks whether the enckey is correct or not
-func (abe *MAABE) CheckKey(pku *bn128.G1, enckey *MAABEKey, proof *Proof) (bool, error) {
+func (abe *MAABE) CheckKey(pku *bn128.G1, enckey *MAABEKey, proof *Proof, params ...interface{}) (bool, error) {
+	var hashGID *bn128.G1
+	var F_delta *bn128.G1
+	var left3 *bn128.GT
+	if params != nil && len(params) == 3 {
+		hashGID = params[0].(*bn128.G1)
+		F_delta = params[1].(*bn128.G1)
+		left3 = params[2].(*bn128.GT)
+	} else {
+		hashGID = abe.HashG1(enckey.Gid)
+		F_delta = abe.HashG1(enckey.Attrib)
+		left3 = new(bn128.GT).Add(bn128.Pair(pku, proof.G2ToAlpha), bn128.Pair(hashGID, proof.G2ToBeta))
+	}
 	part1 := new(bn128.G1).ScalarMult(pku, proof.w1)
-	hashGID := abe.HashG1(enckey.Gid)
 	part2 := new(bn128.G1).ScalarMult(hashGID, proof.w2)
-	F_delta := abe.HashG1(enckey.Attrib)
 	part3 := new(bn128.G1).ScalarMult(F_delta, proof.w3)
 	left1 := new(bn128.G1).Add(part1, part2)
 	left1.Add(left1, part3)
@@ -377,7 +387,6 @@ func (abe *MAABE) CheckKey(pku *bn128.G1, enckey *MAABEKey, proof *Proof) (bool,
 		return false, fmt.Errorf("checkKey second equation fails")
 	}
 
-	left3 := new(bn128.GT).Add(bn128.Pair(pku, proof.G2ToAlpha), bn128.Pair(hashGID, proof.G2ToBeta))
 	left3 = new(bn128.GT).Add(left3, bn128.Pair(F_delta, enckey.KeyPrime))
 	right3 := bn128.Pair(enckey.Key, abe.G2)
 	if left3.String() != right3.String() {
